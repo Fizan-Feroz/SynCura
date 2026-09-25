@@ -156,10 +156,10 @@ The immediate priorities are reliability, data-source clarity, automated tests, 
 
 ```text
 frontend/
-├── index.html
+├── index.html               (carries a pre-paint theme script)
 ├── package.json
-├── tailwind.config.js
-├── postcss.config.js
+├── postcss.config.js        (Autoprefixer only)
+├── vercel.json
 └── src/
     ├── main.jsx
     ├── App.jsx
@@ -168,36 +168,57 @@ frontend/
     ├── theme/
     │   └── tokens.css
     ├── motion/
-    │   ├── motion.css
-    │   └── usePageVisibility.js
-    ├── components/
-    │   ├── WelcomePage.jsx
-    │   ├── ArchitecturePage.jsx
-    │   ├── SimulatedDataFeed.jsx
-    │   ├── SensorWaveform.jsx
-    │   ├── TrainingConfig.jsx
-    │   ├── TrainingJobsList.jsx
-    │   └── TrainingMonitor.jsx
-    ├── styles.css
-    └── welcome.css
+    │   └── gsap.js
+    ├── styles/
+    │   ├── base.css
+    │   ├── layout.css
+    │   ├── landing.css
+    │   ├── film.css
+    │   ├── station.css
+    │   └── pages.css
+    └── components/
+        ├── AppShell.jsx
+        ├── Brand.jsx
+        ├── LandingPage.jsx
+        ├── Dashboard.jsx
+        ├── trace.js
+        ├── ArchitecturePage.jsx
+        ├── SimulatedDataFeed.jsx
+        ├── SensorWaveform.jsx
+        ├── TrainingConfig.jsx
+        ├── TrainingJobsList.jsx
+        ├── TrainingMonitor.jsx
+        └── film/
+            ├── HeroFilm.jsx
+            └── scenes.js
 ```
 
 ### Responsibilities
 
-- `main.jsx` loads local fonts, shared theme tokens, motion rules, and the main application styles.
-- `App.jsx` owns the application shell, navigation, routing, dashboard behavior, and global theme state.
-- `simulationContext.jsx` owns synthetic scenarios, patient updates, pause/reset controls, and optional ingestion calls.
+- `main.jsx` loads the self-hosted variable font, then the theme tokens, then the
+  stylesheets in a fixed order. `theme/tokens.css` must stay first — every later
+  sheet consumes its custom properties.
+- `App.jsx` owns routing (all routes are `React.lazy`), the global theme state,
+  and the mapping from `light`/`dark` onto the `paper`/`monitor` attribute.
+- `simulationContext.jsx` owns synthetic scenarios, patient updates, and
+  pause/reset controls. It is entirely client-side.
 - `api.js` centralizes the backend base URL and small `fetch` helpers.
-- `theme/tokens.css` defines shared semantic colors, spacing, radii, shadows, motion durations, and focus styles.
-- `motion/` contains reusable animation and page-visibility behavior.
-- `components/` contains route-level product views.
-- `styles.css` and `welcome.css` provide the main visual system for the application.
+- `theme/tokens.css` is the single source of colour, type, space, radius, and
+  motion for both display modes.
+- `motion/gsap.js` registers the GSAP plugins and exports the `REDUCED` /
+  `MOTION_OK` media queries that every animation must gate on.
+- `styles/` holds the visual system, split by surface: base, layout, landing,
+  film, station, pages.
+- `components/` contains route-level views plus `trace.js`, which owns the drawn
+  ECG path and the risk-tier thresholds.
+
+See `THEME.md` for the full design system.
 
 ### Route Map
 
 | Route | View | Current data source |
 |---|---|---|
-| `/` | Welcome page | Static content and local preview animation |
+| `/` | Landing page | Static content, hero film, and local preview animation |
 | `/dashboard` | Patient dashboard | Synthetic simulation; one offline metrics request |
 | `/simulated-data` | Simulated patient feed | Synthetic simulation context |
 | `/waveforms` | Sensor waveform view | Synthetic waveform transformations |
@@ -270,14 +291,14 @@ Simulation and live modes can share visualization components, but they should us
 | Priority | Area | Finding | Required response |
 |---|---|---|---|
 | P0 | Data integrity | The dashboard displays local simulated risk rather than the score returned by backend inference | Separate simulation and live data modes at the state and component levels |
-| P0 | Feature contract | Training feature selection does not match the documented deployed 12-feature set | Establish one canonical feature list and validate it against the backend |
+| P0 | Feature contract (serving) | The 12-feature order is duplicated in `ml/train.py` and `backend/inference.py` and is only cross-checked under `--deploy`, so a plain run can produce an unservable model | Import one shared constant; add a test that asserts the scaler feature order matches |
 | P0 | Reliability | No route error boundary, explicit 404 view, or consistent request timeout/cancellation | Add failure containment and predictable recovery paths |
 | P1 | API consistency | Request behavior differs between `fetch` and Axios | Consolidate transport, timeout, JSON, and error handling in one client |
 | P1 | Testing | No frontend unit, integration, accessibility, or end-to-end suite | Add focused tests for simulation math, API states, routes, and critical workflows |
 | P1 | Type safety | JSX and JavaScript allow invalid data shapes to reach render code | Introduce TypeScript incrementally, starting with API and simulation models |
 | P1 | Dependency security | `npm audit` reports four advisories: one high and three moderate, affecting Vite, esbuild, and React Router | Plan and test major-version upgrades; do not apply `npm audit fix --force` without compatibility review |
-| P1 | Theme consistency | Training views still depend on fixed Tailwind utilities bridged by broad CSS overrides | Replace the override layer with semantic component styles and tokens |
-| P2 | Motion consistency | Some broad Tailwind transition utilities remain outside the motion policy | Replace broad transitions with explicit property transitions |
+| P1 | Theme consistency | *(resolved)* the Tailwind override layer was replaced by `theme/tokens.css` plus `src/styles/*.css` in the ICU-instruments redesign | Done — see `THEME.md` |
+| P2 | Motion consistency | *(resolved)* broad `transition: all` utilities were removed; animations now gate on `MOTION_OK` from `motion/gsap.js` | Done |
 | P2 | Routing and deployment | BrowserRouter requires correct SPA fallback configuration | Document and test production hosting rewrites |
 | P2 | Observability | Frontend request failures are mostly shown locally or logged to the console | Add structured error reporting for deployed research environments |
 

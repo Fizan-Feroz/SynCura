@@ -167,10 +167,19 @@ Load order is fixed in `src/main.jsx:4-11` and must stay in this order —
 | `motion/gsap.js` | GSAP registration + `REDUCED` / `MOTION_OK` queries |
 | `components/trace.js` | `ecgPath`, `seriesPath`, `riskTone`, `riskLabel` |
 
-Tailwind is **not** in the build. `postcss.config.js` and `autoprefixer` are the
-only PostCSS pieces; there is no `tailwind.config.js` and no Tailwind dependency
-in `package.json`. Several root docs still describe a Tailwind + `tokens.css`
-setup, which is stale — see "Known drift" below.
+Tailwind is **not** in the build. `postcss.config.js` (autoprefixer only) is the
+entire PostCSS config; there is no `tailwind.config.js` and no Tailwind
+dependency in `package.json`. The ICU-instruments redesign replaced the old
+Tailwind + `welcome.css` setup; `AGENTS.md`, `CLAUDE.md`, `README.md`,
+`PROJECT_REPORT.md`, and `QUICK_REFERENCE.md` have all been updated to match.
+The three dated completion records (`FINAL_SUMMARY.md`,
+`IMPLEMENTATION_COMPLETE.md`, `DEPLOYMENT_READY.md`) still describe Tailwind
+inside their bodies and carry a header noting it is obsolete.
+
+`index.html` sets `data-theme="paper"` on `<html>` and runs a small inline script
+before first paint that reads `localStorage` and `prefers-color-scheme`, so a
+dark-mode user never sees a flash of the light theme. `App.jsx` repeats the same
+mapping on the React side afterwards.
 
 ---
 
@@ -222,17 +231,17 @@ across renders. `seriesPath` is the real-data variant.
 
 ## 8. Known drift
 
-These are documented as current state, not fixes:
+Worth knowing, but none of it is broken:
 
-- Root docs (`AGENTS.md`, `CLAUDE.md`) describe a Tailwind build with
-  `frontend/tailwind.config.js`, `theme/tokens.css` + page-local colour systems,
-  and `frontend/src/welcome.css`. None of those exist now. The real build is
-  plain CSS + PostCSS/autoprefixer, the tokens are the only colour system, and
-  the stylesheets are the six files in `styles/`.
-- `App.jsx` still uses `light`/`dark` as React state while CSS uses
-  `paper`/`monitor`. The mapping is in one place (`App.jsx:46`) — keep it there.
-- `components/` contains a `.jsx` per route, all lazy-loaded via `React.lazy`
-  in `App.jsx:6-13`.
+- `App.jsx` uses `light`/`dark` as React state while CSS uses `paper`/`monitor`.
+  The mapping is in one place (`App.jsx:46`), and `index.html` duplicates it
+  pre-paint. Keep both in sync if you rename anything.
+- `components/` holds one `.jsx` per route, all lazy-loaded via `React.lazy` in
+  `App.jsx:6-13`. `trace.js` is the exception: it is a module, not a component.
+- Three dated completion records (`FINAL_SUMMARY.md`, `IMPLEMENTATION_COMPLETE.md`,
+  `DEPLOYMENT_READY.md`) still describe the pre-redesign Tailwind build in their
+  bodies. Each carries a header saying so. They are kept as history; don't treat
+  their styling lines as current.
 
 ---
 

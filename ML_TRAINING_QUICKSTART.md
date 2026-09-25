@@ -19,9 +19,10 @@ The `backend/training.py` module is already implemented with full training job m
 
 ### Start Backend
 
+Run from the repository root so the `ml/` imports resolve:
+
 ```bash
-cd backend
-python -m uvicorn app:app --reload --port 8000
+python -m uvicorn backend.app:app --reload --port 8000
 ```
 
 Verify with: `curl http://localhost:8000/health`
@@ -157,10 +158,9 @@ Returns newline-delimited JSON updates as training progresses.
 
 ### Module Import Errors
 
-**Run:**
+**Run (from the repository root):**
 ```bash
-cd backend
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 Ensure all dependencies are installed:
@@ -247,7 +247,7 @@ print(f"Loss: {job['metrics'].get('train_loss', 'N/A')}")
 
 ### Workflow 1: Quick Test Training
 
-1. Start backend: `python -m uvicorn app:app --reload --port 8000`
+1. Start backend: `python -m uvicorn backend.app:app --reload --port 8000` (from the repo root)
 2. Start frontend: `npm run dev`
 3. Go to http://localhost:5173/training/new
 4. Use small dataset (max_patients: 10, epochs: 2)

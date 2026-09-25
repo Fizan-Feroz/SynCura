@@ -1,5 +1,12 @@
 # ML Training Frontend - Final Verification Checklist
 
+> **Historical checklist (2026-09-08).** The styling items in it that mention
+> Tailwind CSS are obsolete: the build is now plain CSS + PostCSS/autoprefixer
+> against `src/theme/tokens.css`, and `tailwindcss` is no longer a dependency.
+> Deployment has also moved on from the local checklist below — see
+> `render.yaml` (backend) and `frontend/vercel.json` (SPA). Current state:
+> `THEME.md`, `AGENTS.md`.
+
 ## ✅ IMPLEMENTATION COMPLETE
 
 All components for the ML training frontend have been successfully implemented, documented, tested, and committed to the GitHub repository.

@@ -85,25 +85,35 @@ PROJ/
 │   ├── mqtt_subscriber.py       # MQTT subscriber for vital signs
 │   └── requirements.txt         # fastapi, uvicorn, torch, sqlalchemy, etc.
 │
-├── frontend/                    # React 18 + Vite + Tailwind CSS
+├── frontend/                    # React 18 + Vite + plain CSS (NO Tailwind)
 │   ├── src/
-│   │   ├── App.jsx              # Main shell, routing, dashboard layout
-│   │   ├── simulationContext.jsx # Client-side simulation engine (12 patients)
-│   │   ├── theme/tokens.css     # Shared light/dark semantic tokens
-│   │   ├── motion/              # Motion CSS and page-visibility utilities
-│   │   ├── components/
-│   │   │   ├── WelcomePage.jsx       # Landing page with hero
-│   │   │   ├── SensorWaveform.jsx    # SVG waveform charts
-│   │   │   ├── TrainingConfig.jsx    # Training configuration form
-│   │   │   ├── TrainingMonitor.jsx   # Real-time training progress
-│   │   │   ├── TrainingJobsList.jsx  # List of training jobs
-│   │   │   ├── SimulatedDataFeed.jsx # Tabular simulated data view
-│   │   │   └── ArchitecturePage.jsx  # System architecture docs
-│   │   └── welcome.css
-│   ├── tailwind.config.js       # Tailwind content scanning and token aliases
-│   ├── postcss.config.js        # Tailwind and Autoprefixer pipeline
-│   ├── package.json             # react, react-router-dom, axios, chart.js
-│   └── index.html
+│   │   ├── App.jsx              # Router, lazy routes, theme state (light/dark -> paper/monitor)
+│   │   ├── main.jsx             # Entrypoint; CSS load order matters, tokens.css first
+│   │   ├── simulationContext.jsx # Client-side simulation engine (synthetic, not backend-fed)
+│   │   ├── api.js               # Backend HTTP client
+│   │   ├── theme/tokens.css     # ALL design tokens; only place with hex colour (film.css excepted)
+│   │   ├── styles/              # base, layout, landing, film, station, pages
+│   │   ├── motion/gsap.js       # GSAP plugins + REDUCED / MOTION_OK media queries
+│   │   └── components/
+│   │       ├── AppShell.jsx     # Top bar, nav, theme switch, skip link
+│   │       ├── LandingPage.jsx  # Landing page
+│   │       ├── film/            # HeroFilm.jsx + scenes.js (scroll-driven GSAP)
+│   │       ├── Dashboard.jsx    # Central station
+│   │       ├── SensorWaveform.jsx # SVG waveform charts
+│   │       ├── trace.js         # ecgPath, seriesPath, riskTone thresholds
+│   │       ├── TrainingConfig.jsx # Training configuration form
+│   │       ├── TrainingMonitor.jsx # Real-time training progress
+│   │       ├── TrainingJobsList.jsx # List of training jobs
+│   │       ├── SimulatedDataFeed.jsx # Tabular simulated data view
+│   │       ├── ArchitecturePage.jsx # System architecture docs
+│   │       └── Brand.jsx
+│   ├── postcss.config.js        # Autoprefixer only
+│   ├── vercel.json              # SPA rewrite
+│   ├── package.json             # react, react-router-dom, axios, gsap, @fontsource-variable/archivo
+│   └── index.html               # Carries a pre-paint theme script to avoid a flash of light mode
+│
+│   NOTE: there is no tailwind.config.js, no welcome.css, and no Tailwind
+│   dependency. See THEME.md for the full design system.
 │
 ├── discordbot/                  # Discord alert bot
 ├── chatbot-tele/                # Telegram chatbot
@@ -191,12 +201,14 @@ Notes:
 ## Code Conventions
 
 - **Python**: Follow existing style, no comments unless complex logic
-- **JavaScript/JSX**: React functional components with hooks, Tailwind CSS classes
-- **Frontend theme**: Use `frontend/src/theme/tokens.css` for both light and dark semantic tokens; do not introduce page-local color systems.
-- **Frontend motion**: Use `frontend/src/motion/` utilities. Never use `transition: all`; animate only approved state properties and provide a reduced-motion path.
-- **Frontend honesty**: Keep the simulation banner, research-prototype qualifiers, and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence.
+- **JavaScript/JSX**: React functional components with hooks, styled with the plain CSS in `frontend/src/styles/` using BEM-ish class names. There is no Tailwind and no CSS-in-JS. Full design system: `THEME.md`.
+- **Frontend theme**: `frontend/src/theme/tokens.css` is the single source of colour, type, space, radius, and motion. Two modes: `paper` (light) and `monitor` (dark). Do not hardcode hex outside `tokens.css` and `styles/film.css` (the hero film is deliberately its own dark stage), and do not introduce page-local colour systems.
+- **Frontend type**: one family (Archivo Variable, self-hosted). Change hierarchy with the width axis (`--wide` / `--normal` / `--narrow`), never by adding a second typeface.
+- **Frontend motion**: use `REDUCED` / `MOTION_OK` from `frontend/src/motion/gsap.js` and register animations inside `mm.add(MOTION_OK, ...)`. Never use `transition: all`; animate only explicit properties. A new animation without a reduced-motion path is a bug.
+- **Frontend risk tiers**: the thresholds live in `frontend/src/components/trace.js` (`riskTone`, 45/70/85). Use those helpers; do not re-derive tiers in a component.
+- **Frontend honesty**: keep the simulation banner, research-prototype qualifiers, and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence. The vitals on screen are client-side synthetic data from `simulationContext.jsx`, not a live patient feed.
 - **No new dependencies** without checking existing ones first
-- **Model compatibility**: Always update both `train.py` AND `inference.py` when changing features/architecture
+- **Model compatibility**: always update both `train.py` AND `inference.py` when changing features/architecture. The 12-feature order is duplicated in `ml/train.py` (`SERVING_FEATURES`) and `backend/inference.py` (`FEATURES`); `train.py` only enforces agreement when `--deploy` is passed, so a plain training run can silently produce an unservable model.
 - **Thread safety**: RiskScoreEngine uses `threading.Lock()` for concurrent access
 
 ## Testing
@@ -213,18 +225,19 @@ curl http://localhost:8000/health
 curl -X POST http://localhost:8000/ingest -H "Content-Type: application/json" -d '{"patient_id":"test","timestamp":1,"HR":85,"SpO2":98,"RespRate":16,"Temp":37,"NISysABP":120,"NIDiasABP":80}'
 ```
 
-Frontend UI detector:
+Frontend checks:
 
 ```powershell
-npx impeccable detect frontend/src
+cd frontend
+npm run build     # catches broken imports and CSS ordering
 ```
 
 ## Known Issues
 
 - Frontend simulation is client-side only (does not read back from backend)
-- Model stats in frontend WelcomePage may still be hardcoded (check before modifying)
-- `chart.js` and `socket.io-client` are in package.json but unused
+- The 12-feature order lives in two places (`ml/train.py` and `backend/inference.py`) and is only cross-checked under `--deploy`; see Code Conventions
 - No unit tests exist yet
+- `chart.js` and `socket.io-client` were removed from `frontend/package.json` in the redesign; do not reintroduce them, the UI draws SVG traces directly
 - `ml/models/*.pt` is gitignored, so scratch checkpoints need `git add -f`. The deployed
   ensemble `ml/models/ensemble/{s48,c93,s45}.pt` is tracked on purpose (Render boots from it,
   no retraining) — update those files and `ml/deployed_manifest.json` together.

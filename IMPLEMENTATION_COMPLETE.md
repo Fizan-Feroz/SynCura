@@ -1,5 +1,12 @@
 # ML Training Frontend - Implementation Summary
 
+> **Historical record (2026-09-08).** The frontend has since been redesigned as
+> an ICU-instruments interface (paper/monitor modes) using plain CSS against
+> `src/theme/tokens.css` — **Tailwind is gone**, `WelcomePage.jsx` is now
+> `LandingPage.jsx`, and `index.css`/`welcome.css` no longer exist. See `THEME.md`
+> for the current design system. The training components, routes, and API
+> described below are still accurate.
+
 ## Project Status: COMPLETE ✅
 
 A fully-featured ML training interface has been successfully developed for the Predictive ICU Monitoring System hackathon project.

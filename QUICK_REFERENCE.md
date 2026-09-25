@@ -89,15 +89,28 @@ ionerdstechfusion/
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── App.jsx               (Router + navigation) 🔄 UPDATED
+│   │   ├── App.jsx               (Router + lazy routes + theme state)
+│   │   ├── main.jsx              (Entrypoint; CSS load order)
+│   │   ├── theme/tokens.css      (All design tokens)
+│   │   ├── styles/               (base, layout, landing, film, station, pages)
+│   │   ├── motion/gsap.js        (GSAP + reduced-motion)
 │   │   ├── components/
-│   │   │   ├── TrainingConfig.jsx        (Form) ⭐ NEW
-│   │   │   ├── TrainingMonitor.jsx       (Dashboard) ⭐ NEW
-│   │   │   └── TrainingJobsList.jsx      (Job list) ⭐ NEW
-│   │   └── index.css
-│   ├── package.json              (Dependencies) 🔄 UPDATED
+│   │   │   ├── AppShell.jsx      (Top bar, nav, theme switch)
+│   │   │   ├── LandingPage.jsx
+│   │   │   ├── film/             (HeroFilm + scenes)
+│   │   │   ├── Dashboard.jsx
+│   │   │   ├── trace.js          (ecgPath, seriesPath, riskTone)
+│   │   │   ├── TrainingConfig.jsx    (Form)
+│   │   │   ├── TrainingMonitor.jsx   (Progress)
+│   │   │   ├── TrainingJobsList.jsx  (Job list)
+│   │   │   ├── SimulatedDataFeed.jsx
+│   │   │   └── ArchitecturePage.jsx
+│   │   └── api.js
+│   ├── postcss.config.js         (Autoprefixer only)
+│   ├── vercel.json               (SPA rewrite)
+│   ├── package.json              (Dependencies)
 │   ├── vite.config.js
-│   └── tailwind.config.js
+│   └── index.html                (Pre-paint theme script)
 ├── ml/
 │   ├── train.py                  (Training entry point)
 │   ├── train_lstm.py             (LSTM model)

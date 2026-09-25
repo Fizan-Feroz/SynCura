@@ -236,24 +236,29 @@ PHYSIONET_DATA_PATH=/path/to/physionet/data
 
 ### Frontend Dependencies
 
-Ensure `package.json` includes:
-- `react-router-dom` (for routing)
-- `axios` (for HTTP requests)
-- `tailwindcss` (for styling)
+`frontend/package.json` already includes everything needed:
+- `react-router-dom` (routing)
+- `axios` (HTTP requests)
+- `gsap` + `@gsap/react` (scroll-driven motion)
+- `@fontsource-variable/archivo` (self-hosted variable font)
 
-Run `npm install` to install dependencies after package.json update.
+Run `npm install` in `frontend/`. Styling is plain CSS against the tokens in
+`src/theme/tokens.css` — there is no Tailwind and no Tailwind dependency. See
+`THEME.md` before changing any component's appearance.
+
+Note: the backend is started from the repo root as `uvicorn backend.app:app`, not
+from inside `backend/`, so the `ml/` imports resolve.
 
 ## Usage
 
 ### Starting the System
 
-1. **Backend:**
+1. **Backend** (run from the repository root):
 ```bash
-cd backend
 python -m venv venv
 source venv/bin/activate  # or venv\Scripts\activate on Windows
-pip install -r requirements.txt
-python -m uvicorn app:app --reload --port 8000
+pip install -r backend/requirements.txt
+python -m uvicorn backend.app:app --reload --port 8000
 ```
 
 2. **Frontend:**
