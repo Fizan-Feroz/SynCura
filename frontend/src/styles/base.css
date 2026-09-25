@@ -1,0 +1,340 @@
+/* ---------- Reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--paper);
+}
+
+body {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-md);
+  line-height: 1.55;
+  font-stretch: var(--normal);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color var(--normal-dur) var(--ease), color var(--normal-dur) var(--ease);
+}
+
+img,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+a {
+  color: inherit;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+::selection {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: var(--space-4);
+  top: -60px;
+  z-index: 100;
+  padding: var(--space-2) var(--space-4);
+  background: var(--brand);
+  color: var(--brand-ink);
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  top: var(--space-3);
+}
+
+/* ---------- Type ---------- */
+h1,
+h2,
+h3 {
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: var(--t-2xl);
+  font-stretch: var(--wide);
+}
+
+h2 {
+  font-size: var(--t-xl);
+  font-stretch: 110%;
+}
+
+h3 {
+  font-size: var(--t-lg);
+  line-height: 1.2;
+}
+
+p {
+  max-width: 68ch;
+  text-wrap: pretty;
+}
+
+.lede {
+  font-size: var(--t-lg);
+  line-height: 1.45;
+  color: var(--ink-soft);
+  max-width: 54ch;
+}
+
+.muted {
+  color: var(--ink-soft);
+}
+
+.small {
+  font-size: var(--t-sm);
+}
+
+/* Monitor-style numerals: narrow, tabular */
+.num {
+  font-stretch: var(--narrow);
+  font-variant-numeric: tabular-nums;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- Chart-paper grid ---------- */
+.grid-paper {
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(var(--grid-major) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-major) 1px, transparent 1px),
+    linear-gradient(var(--grid-minor) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-minor) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+  background-position: -1px -1px;
+}
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-5);
+  border: 1.5px solid var(--ink);
+  border-radius: var(--radius);
+  font-weight: 650;
+  font-size: var(--t-sm);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease),
+    border-color var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.btn-primary:hover {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+}
+
+.btn-ghost:hover {
+  background: var(--surface-2);
+}
+
+.btn-quiet {
+  border-color: var(--line-strong);
+  background: var(--surface);
+}
+
+.btn-quiet:hover {
+  border-color: var(--ink);
+}
+
+.btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-sm {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+}
+
+/* ---------- Segmented control ---------- */
+.segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.segmented button {
+  min-height: 34px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--t-sm);
+  font-weight: 560;
+  color: var(--ink-soft);
+  transition: background-color var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.segmented button:hover {
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- Form fields ---------- */
+.field {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.field label,
+.field-label {
+  font-size: var(--t-sm);
+  font-weight: 620;
+}
+
+.field input[type='text'],
+.field input[type='number'] {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1.5px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color var(--fast) var(--ease);
+}
+
+.field input:hover {
+  border-color: var(--ink-faint);
+}
+
+.field input:focus-visible {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 22%, transparent);
+}
+
+.field .hint {
+  font-size: var(--t-xs);
+  color: var(--ink-soft);
+}
+
+input[type='range'] {
+  width: 100%;
+  accent-color: var(--brand);
+}
+
+input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand);
+}
+
+/* ---------- Status ---------- */
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-xs);
+  font-weight: 650;
+}
+
+.status::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-stable { color: var(--stable); }
+.status-watch { color: var(--watch); }
+.status-high { color: var(--high); }
+.status-critical { color: var(--critical); }
+
+/* ---------- Notices ---------- */
+.notice {
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--watch);
+  background: var(--watch-bg);
+  font-size: var(--t-sm);
+}
+
+.notice-error {
+  border-left-color: var(--critical);
+  background: var(--critical-bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
