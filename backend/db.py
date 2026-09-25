@@ -33,6 +33,10 @@ def init_db():
         for col in LAB_COLUMNS:
             if col not in existing:
                 cur.execute(f"ALTER TABLE vitals ADD COLUMN {col} REAL")
+        # Every dashboard query filters by patient and orders by time.
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_vitals_patient_ts ON vitals (patient_id, timestamp)")
+        # WAL lets the dashboard read while ingest writes (default mode blocks readers).
+        cur.execute("PRAGMA journal_mode=WAL")
         conn.commit()
 
 
@@ -89,15 +93,22 @@ def get_latest_vitals(patient_id, limit=10):
 
 
 def get_top_patients(limit=6):
-    """Get top N patients by latest risk score."""
+    """Get top N patients by latest risk score (exactly one row per patient).
+
+    Ties on timestamp (e.g. a device sending a constant timestamp) resolve to
+    the most recently inserted row instead of returning the patient twice.
+    """
     conn = sqlite3.connect(DB_PATH)
     with closing(conn):
         cur = conn.cursor()
         cur.execute("""
-            SELECT patient_id, risk_score, timestamp FROM vitals
-            WHERE (patient_id, timestamp) IN (
-                SELECT patient_id, MAX(timestamp) FROM vitals GROUP BY patient_id
+            SELECT patient_id, risk_score, timestamp FROM (
+                SELECT patient_id, risk_score, timestamp,
+                       ROW_NUMBER() OVER (PARTITION BY patient_id
+                                          ORDER BY timestamp DESC, id DESC) AS rn
+                FROM vitals
             )
+            WHERE rn = 1
             ORDER BY risk_score DESC
             LIMIT ?
         """, (limit,))
