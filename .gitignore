@@ -52,3 +52,8 @@ backend/data/training_jobs.json
 
 # Shared datasets (fetched via scripts/download_data.py, never commit data bytes)
 data/
+
+# Reference videos (large binaries, never commit)
+*.webm
+*.mp4
+*.mov
