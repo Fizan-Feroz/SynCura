@@ -20,11 +20,11 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 
 try:
     from backend.db import init_db, insert_vital, get_latest_vitals, get_top_patients
-    from backend.inference import get_engine
+    from backend.inference import get_engine, FEATURES
     from backend.training import training_manager
 except ImportError:
     from db import init_db, insert_vital, get_latest_vitals, get_top_patients
-    from inference import get_engine
+    from inference import get_engine, FEATURES
     from training import training_manager
 
 app = FastAPI()
@@ -42,10 +42,14 @@ if DISCORD_WEBHOOK_URL:
 else:
     logger.warning("Discord webhook NOT configured. Set DISCORD_WEBHOOK_URL in .env for alerts")
 
+# Comma-separated allow-list, e.g. "http://localhost:5173". Browsers reject a
+# wildcard origin combined with credentials, so credentials are only enabled
+# for an explicit allow-list.
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials="*" not in CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,8 +59,9 @@ ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "120"))
 # Minimum risk required to send risk-based Discord alerts (0-100)
 MIN_DISCORD_RISK = int(os.getenv("MIN_DISCORD_RISK", "90"))
 
-# Internal cache for last-sent timestamps
+# Internal cache for last-sent timestamps (ingest runs on a threadpool)
 _last_alert_sent = {}
+_alert_lock = threading.Lock()
 
 # Key used when applying a per-patient cooldown (aggregate alerts)
 _PATIENT_COOLDOWN_KEY = "__patient_alert__"
@@ -87,11 +92,12 @@ def _should_send_alert(patient_id: str, alert_key: str) -> bool:
     """
     now = time.time()
     cache_key = (patient_id, alert_key)
-    last_sent = _last_alert_sent.get(cache_key, 0)
-    if (now - last_sent) < ALERT_COOLDOWN_SECONDS:
-        return False
-    _last_alert_sent[cache_key] = now
-    return True
+    with _alert_lock:
+        last_sent = _last_alert_sent.get(cache_key, 0)
+        if (now - last_sent) < ALERT_COOLDOWN_SECONDS:
+            return False
+        _last_alert_sent[cache_key] = now
+        return True
 
 
 def _should_send_patient_alert(patient_id: str) -> bool:
@@ -312,37 +318,17 @@ def get_metrics():
 
 @app.get("/patient/{patient_id}/explain")
 def explain_patient(patient_id: str):
-    """Return SHAP feature importance and attention weights for a patient."""
-    import numpy as np
-    from backend.inference import FEATURES
+    """Return SHAP feature importance and attention weights for a patient.
 
-    buffer_data = None
-    with inference_engine.lock:
-        if patient_id not in inference_engine.vital_buffer:
-            return {"error": f"No data for patient {patient_id}"}
-        buffer_data = np.array(list(inference_engine.vital_buffer[patient_id]), dtype=np.float32)
-
+    SHAP runs on exactly the normalized window the primary model scores, so
+    the explanation cannot disagree with the preprocessing behind the score.
+    """
     if inference_engine.model is None:
         return {"error": "No model loaded"}
+    X = inference_engine.get_model_input(patient_id)
+    if X is None:
+        return {"error": f"No data for patient {patient_id}"}
 
-    # Normalize the buffer
-    X = buffer_data.copy()
-    for i in range(X.shape[1]):
-        mask = ~np.isnan(X[:, i])
-        if mask.sum() > 0:
-            X[~mask, i] = X[mask, i].mean()
-        else:
-            X[:, i] = 0.0
-    if inference_engine._train_mean is not None:
-        X = (X - inference_engine._train_mean) / inference_engine._train_std
-    else:
-        std = X.std(axis=0) + 1e-6
-        X = (X - X.mean(axis=0)) / std
-    if len(X) < inference_engine.window_size:
-        pad = np.zeros((inference_engine.window_size - len(X), X.shape[1]), dtype=np.float32)
-        X = np.vstack([pad, X])
-
-    # Compute attention weights
     attention = inference_engine.get_attention_weights(patient_id)
 
     # Compute SHAP (may be slow, so keep nsamples small)
@@ -368,8 +354,7 @@ def start_training(config: TrainingConfig):
     config_dict = config.model_dump()
     # Enforce the deployment contract: only the 12-feature / 90-min / h96
     # config may be promoted to serving; anything else trains in isolation.
-    from backend.inference import FEATURES as SERVING_FEATURES
-    if (sorted(config_dict.get("vital_features", [])) != sorted(SERVING_FEATURES)
+    if (sorted(config_dict.get("vital_features", [])) != sorted(FEATURES)
             or int(config_dict.get("window", 90)) != 90
             or int(config_dict.get("hidden_size", 96)) != 96):
         config_dict["_promotable"] = False

@@ -3,7 +3,7 @@ Minimal LSTM training scaffold (PyTorch) with AttentionLSTMModel.
 """
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 import numpy as np
 
 
@@ -124,7 +124,12 @@ def train(
     - `weight_decay`: L2 regularization for Adam.
     - Returns `(model, optimizer)` so callers can keep training the same model.
     """
-    dataset = SimpleLSTMDataset(X, y)
+    # One tensor for the whole array: batches are slices, not per-sample
+    # torch.tensor() copies (SimpleLSTMDataset is kept for old callers).
+    dataset = TensorDataset(
+        torch.from_numpy(np.ascontiguousarray(X, dtype=np.float32)),
+        torch.from_numpy(np.ascontiguousarray(y, dtype=np.float32)),
+    )
     if device is None:
         device = "cuda" if torch.cuda.is_available() else "cpu"
 

@@ -1,10 +1,16 @@
 """High-level training script for PhysioNet 2012 dataset.
 
-Standard (reportable) run - full set-a, proximity labels, population norm:
+Standard (reportable) run - full set-a, proximity labels, population norm.
+Defaults match the serving contract (12 features, 90-min window, hidden 96):
   python -m ml.train --physionet <set-a> --outcomes <Outcomes-a.txt> \
     --epochs 25 --patience 7 --stride 15 --batch-size 128 --lr 0.0003
 
 Smoke test only (not reportable): add --max-patients 100 --epochs 2
+
+Artifacts always go to the run dir. `--deploy` additionally installs the model
+as the single-model fallback (ml/models/lstm_baseline.pt + its own
+lstm_baseline_scaler.json). It never writes ml/scaler.json, which the deployed
+ensemble members depend on, and refuses configs the engine cannot serve.
 """
 import argparse
 import datetime
@@ -13,6 +19,7 @@ import json
 import shutil
 import numpy as np
 import logging
+import warnings
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
 from sklearn.model_selection import GroupShuffleSplit
 import torch
@@ -20,6 +27,13 @@ from tqdm import tqdm
 
 from ml.dataset import load_and_create_sequences
 from ml.train_lstm import train as quick_train, AttentionLSTMModel
+
+# Serving contract (backend/inference.py builds exactly this input).
+SERVING_FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
+                    'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+SERVING_WINDOW = 90
+SERVING_HIDDEN = 96
+DEPLOY_MODEL_PATH = os.path.join('ml', 'models', 'lstm_baseline.pt')
 
 
 def setup_logging(log_path):
@@ -63,13 +77,40 @@ def evaluate_model(model, X, y, batch_size=4096, device=None):
     return {'auc': float(auc), 'accuracy': float(acc), 'precision': float(prec), 'recall': float(rec)}
 
 
-def main():
+def serving_contract_errors(args):
+    """Reasons the trained config cannot be served by the 12-feature engine ([] = servable)."""
+    errors = []
+    if list(args.vital_features) != SERVING_FEATURES:
+        errors.append(f'vital_features must be {SERVING_FEATURES} in that order')
+    if args.window != SERVING_WINDOW:
+        errors.append(f'window must be {SERVING_WINDOW}')
+    if args.hidden_size != SERVING_HIDDEN:
+        errors.append(f'hidden_size must be {SERVING_HIDDEN}')
+    if args.bidirectional:
+        errors.append('bidirectional models are not servable')
+    return errors
+
+
+def deploy_artifacts(run_dir, model_path=DEPLOY_MODEL_PATH):
+    """Install run_dir/model.pt + scaler.json as the single-model fallback.
+
+    The scaler goes NEXT TO the model (<model>_scaler.json), never to
+    ml/scaler.json, so ensemble members keep their normalization stats.
+    """
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    shutil.copy2(os.path.join(run_dir, 'model.pt'), model_path)
+    scaler_path = os.path.splitext(model_path)[0] + '_scaler.json'
+    shutil.copy2(os.path.join(run_dir, 'scaler.json'), scaler_path)
+    return model_path, scaler_path
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--physionet', required=True, help='Path to PhysioNet set-a/b/c directory')
     parser.add_argument('--outcomes', required=True, help='Path to Outcomes-a.txt/b.txt/c.txt file')
     parser.add_argument('--vital-features', nargs='+',
-                        default=['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2'])
-    parser.add_argument('--window', type=int, default=60, help='Window size in minutes')
+                        default=list(SERVING_FEATURES))
+    parser.add_argument('--window', type=int, default=SERVING_WINDOW, help='Window size in minutes')
     parser.add_argument('--stride', type=int, default=15, help='Minutes between consecutive windows (decorrelates windows)')
     parser.add_argument('--label-mode', choices=['all', 'last', 'proximity'], default='proximity',
                         help="Windowing/labels: 'all' labels every window (noisy), 'last' keeps final window only, "
@@ -78,7 +119,7 @@ def main():
     parser.add_argument('--batch-size', type=int, default=32)
     parser.add_argument('--lr', type=float, default=1e-3, help='Adam learning rate')
     parser.add_argument('--dropout', type=float, default=None, help='Dropout rate (default: model default)')
-    parser.add_argument('--hidden-size', type=int, default=64, help='LSTM hidden size')
+    parser.add_argument('--hidden-size', type=int, default=SERVING_HIDDEN, help='LSTM hidden size')
     parser.add_argument('--bidirectional', action='store_true', help='Use bidirectional LSTM (DEWS-style)')
     parser.add_argument('--weight-decay', type=float, default=0.0, help='Adam L2 regularization')
     parser.add_argument('--max-patients', type=int, default=None)
@@ -86,9 +127,16 @@ def main():
     parser.add_argument('--patience', type=int, default=5, help='Early stopping patience')
     parser.add_argument('--min-delta', type=float, default=0.001, help='Min AUC improvement for early stopping')
     parser.add_argument('--run-dir', default=None, help='Directory to store run outputs (model, logs, metrics)')
+    parser.add_argument('--deploy', action='store_true',
+                        help='Install the model as ml/models/lstm_baseline.pt (+ its own scaler). '
+                             'Refused unless the config matches the serving contract.')
     parser.add_argument('--no-deploy', action='store_true',
-                        help='Skip copying model/scaler to ml/models and ml/scaler.json (for smoke tests)')
-    args = parser.parse_args()
+                        help='Deprecated no-op: training no longer deploys unless --deploy is given')
+    args = parser.parse_args(argv)
+    if args.deploy:
+        errors = serving_contract_errors(args)
+        if errors:
+            parser.error('--deploy refused: ' + '; '.join(errors))
 
     # create a run directory if not provided
     if args.run_dir:
@@ -111,21 +159,26 @@ def main():
         label_mode=args.label_mode,
         horizon_hours=args.horizon_hours,
     )
+    X = X.astype(np.float32)  # float32 halves memory vs the float64 windows
     logger.info(f'Loaded X={X.shape} y={y.shape}, class distribution: {np.bincount(y.astype(int))}')
 
     # Patient-level train/val split to prevent data leakage
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     train_idx, val_idx = next(gss.split(X, y, groups=patient_ids))
-    X_train, y_train = X[train_idx].astype(np.float64), y[train_idx]
-    X_val, y_val = X[val_idx].astype(np.float64), y[val_idx]
+    X_train, y_train = X[train_idx], y[train_idx]
+    X_val, y_val = X[val_idx], y[val_idx]
+    del X
     logger.info(f'Split: train={X_train.shape[0]} val={X_val.shape[0]} (patient-level)')
 
     # Population normalization (Issue 1): statistics from TRAIN ONLY, so absolute
     # severity is preserved. Per-patient z-scoring would erase it. NaNs (columns
     # entirely missing for a patient) are filled with the training mean.
     flat = X_train.reshape(-1, X_train.shape[-1])
-    train_mean = np.nanmean(flat, axis=0)
-    train_std = np.nanstd(flat, axis=0) + 1e-6
+    # Accumulate in float64 for accurate stats without a float64 copy of X.
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)  # all-NaN feature
+        train_mean = np.nanmean(flat, axis=0, dtype=np.float64)
+        train_std = np.nanstd(flat, axis=0, dtype=np.float64) + 1e-6
     # A feature entirely missing from training (all-NaN) gets neutral stats:
     # missing values filled with 0.0 then normalize to exactly 0.
     train_mean = np.where(np.isnan(train_mean), 0.0, train_mean)
@@ -133,10 +186,9 @@ def main():
     logger.info(f'Population stats per feature {args.vital_features}:')
     for f, m, s in zip(args.vital_features, train_mean, train_std):
         logger.info(f'  {f}: mean={m:.3f} std={s:.3f}')
-    X_train = (np.where(np.isnan(X_train), train_mean, X_train) - train_mean) / train_std
-    X_val = (np.where(np.isnan(X_val), train_mean, X_val) - train_mean) / train_std
-    X_train = X_train.astype(np.float32)
-    X_val = X_val.astype(np.float32)
+    mean32, std32 = train_mean.astype(np.float32), train_std.astype(np.float32)
+    X_train = (np.where(np.isnan(X_train), mean32, X_train) - mean32) / std32
+    X_val = (np.where(np.isnan(X_val), mean32, X_val) - mean32) / std32
 
     scaler = {'features': args.vital_features,
               'mean': [float(v) for v in train_mean],
@@ -161,7 +213,9 @@ def main():
 
     epoch_bar = tqdm(range(args.epochs), desc='Training', unit='epoch')
     model, opt = None, None
+    epochs_trained = 0
     for epoch in epoch_bar:
+        epochs_trained = epoch + 1
         epoch_bar.set_postfix({'best_auc': f'{best_auc:.4f}', 'patience': f'{patience_counter}/{args.patience}'})
 
         # Continue training the SAME model (weights + optimizer state persist).
@@ -211,7 +265,7 @@ def main():
     # Final evaluation
     final_metrics = evaluate_model(model, X_val, y_val)
     final_metrics['best_auc'] = best_auc
-    final_metrics['epochs_trained'] = epoch + 1
+    final_metrics['epochs_trained'] = epochs_trained
 
     # Save final metrics
     metrics_path = os.path.join(run_dir, 'metrics.json')
@@ -239,19 +293,12 @@ def main():
     save_model(model, model_path)
     logger.info('Saved final model to %s', model_path)
 
-    # Copy to default inference location (unless smoke testing)
-    if not args.no_deploy:
-        default_model_path = 'ml/models/lstm_baseline.pt'
-        os.makedirs(os.path.dirname(default_model_path), exist_ok=True)
-        shutil.copy2(model_path, default_model_path)
-        logger.info('Copied model to %s', default_model_path)
-
-        # Copy scaler stats for inference (must use identical normalization live)
-        default_scaler_path = 'ml/scaler.json'
-        shutil.copy2(os.path.join(run_dir, 'scaler.json'), default_scaler_path)
-        logger.info('Copied scaler stats to %s', default_scaler_path)
+    if args.deploy:
+        dm, ds = deploy_artifacts(run_dir)
+        logger.info('Deployed single-model fallback: %s + %s', dm, ds)
     else:
-        logger.info('Skipping deploy (--no-deploy)')
+        logger.info('Not deployed (pass --deploy, or add the run to ml/deployed_manifest.json)')
+    return final_metrics
 
 
 if __name__ == '__main__':

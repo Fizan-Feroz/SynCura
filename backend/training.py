@@ -9,6 +9,7 @@ import os
 import threading
 import queue
 import uuid
+import warnings
 from datetime import datetime
 from typing import Dict, List, Optional
 import numpy as np
@@ -19,6 +20,29 @@ from ml.train_lstm import train as quick_train
 from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, recall_score
 
 JOBS_STORE = os.path.join('backend', 'data', 'training_jobs.json')
+
+
+def population_stats(X_train):
+    """Per-feature train mean/std ignoring NaN (float64 accumulation).
+
+    A feature never observed in the training data (all-NaN) gets neutral
+    stats (mean 0, std 1) so its NaNs fill to 0 instead of poisoning every
+    sample with NaN, matching ml/train.py.
+    """
+    flat = X_train.reshape(-1, X_train.shape[-1])
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore', RuntimeWarning)
+        mean = np.nanmean(flat, axis=0, dtype=np.float64)
+        std = np.nanstd(flat, axis=0, dtype=np.float64) + 1e-6
+    mean = np.where(np.isnan(mean), 0.0, mean)
+    std = np.where(np.isnan(std), 1.0, std)
+    return mean, std
+
+
+def normalize(X, mean, std):
+    """Fill NaN with the train mean, z-score, return float32."""
+    mean32, std32 = mean.astype(np.float32), std.astype(np.float32)
+    return ((np.where(np.isnan(X), mean32, X) - mean32) / std32).astype(np.float32)
 
 
 class TrainingJob:
@@ -41,6 +65,7 @@ class TrainingJob:
             "recall": None
         }
         self.error_message = None
+        self.created_at = datetime.now().isoformat()
         self.progress_queue = queue.Queue()
         
     def to_dict(self):
@@ -55,7 +80,7 @@ class TrainingJob:
             "progress": int((self.current_epoch / self.total_epochs) * 100) if self.total_epochs > 0 else 0,
             "metrics": self.metrics,
             "error_message": self.error_message,
-            "created_at": datetime.now().isoformat()
+            "created_at": self.created_at
         }
 
 
@@ -87,6 +112,7 @@ class TrainingManager:
                     if isinstance(jd.get('metrics'), dict):
                         job.metrics.update(jd['metrics'])
                     job.error_message = job.error_message or jd.get('error_message')
+                    job.created_at = jd.get('created_at') or job.start_time or job.created_at
                     self.jobs[job.job_id] = job
                 self.history = data.get('history', [])
         except Exception as e:
@@ -163,6 +189,7 @@ class TrainingManager:
             # Patient-level train/val split to prevent data leakage
             gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
             train_idx, val_idx = next(gss.split(X, y, groups=patient_ids))
+            X = X.astype(np.float32)
             X_train, y_train = X[train_idx], y[train_idx]
             X_val, y_val = X[val_idx], y[val_idx]
             job.progress_queue.put({
@@ -171,13 +198,9 @@ class TrainingManager:
             })
 
             # Population normalization from TRAIN ONLY (preserves absolute severity)
-            flat = X_train.reshape(-1, X_train.shape[-1]).astype(np.float64)
-            train_mean = np.nanmean(flat, axis=0)
-            train_std = np.nanstd(flat, axis=0) + 1e-6
-            X_train = (np.where(np.isnan(X_train), train_mean, X_train) - train_mean) / train_std
-            X_val = (np.where(np.isnan(X_val), train_mean, X_val) - train_mean) / train_std
-            X_train = X_train.astype(np.float32)
-            X_val = X_val.astype(np.float32)
+            train_mean, train_std = population_stats(X_train)
+            X_train = normalize(X_train, train_mean, train_std)
+            X_val = normalize(X_val, train_mean, train_std)
             
             # Compute pos_weight for class imbalance
             n_neg = int((y_train == 0).sum())
@@ -197,7 +220,7 @@ class TrainingManager:
                 pos_weight=pos_weight,
                 dropout=config.get('dropout', None),
                 weight_decay=config.get('weight_decay', 0.0),
-                hidden_size=config.get('hidden_size', 64),
+                hidden_size=config.get('hidden_size', 96),
             )
 
             # Evaluate on validation set
@@ -239,9 +262,10 @@ class TrainingManager:
             })
         
         finally:
-            self.active_job = None
-            # Save to history
-            self.history.append(job.to_dict())
+            with self._lock:
+                self.active_job = None
+                # Save to history
+                self.history.append(job.to_dict())
             self._save_store()
 
     def _training_progress_callback(self, job: TrainingJob):

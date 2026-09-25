@@ -25,6 +25,27 @@ PARAMETER_ALIASES = {
 }
 
 
+def carry_forward(window, initial=None):
+    """Forward-fill a (T, F) window, seeded with last-known values from before it.
+
+    Serving-side mirror of the training windows in
+    create_sequences_from_physionet (`df_raw.ffill()` over the whole stay, then
+    slice): a gap takes the most recent earlier observation, including one
+    measured before the window started (`initial`, NaN = never observed).
+    No interpolation and no backward fill, so nothing leaks from the future.
+    Values never observed stay NaN; callers fill them with the train mean.
+    """
+    W = np.array(window, dtype=np.float64, copy=True)
+    last = (np.full(W.shape[1], np.nan) if initial is None
+            else np.array(initial, dtype=np.float64, copy=True))
+    for t in range(W.shape[0]):
+        row = W[t]
+        missing = np.isnan(row)
+        row[missing] = last[missing]
+        last = row
+    return W
+
+
 def load_physionet_file(file_path, patient_outcome=None):
     """Load a single PhysioNet patient file and pivot to wide format."""
     df = pd.read_csv(file_path)
