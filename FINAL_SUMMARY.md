@@ -1,5 +1,14 @@
 # ML Training Frontend - COMPLETE IMPLEMENTATION
 
+> **Historical record (2026-09-08).** This file snapshots the ML training UI at
+> that date. The frontend has since been redesigned as an ICU-instruments
+> interface using plain CSS against a token system — **there is no Tailwind now**,
+> `WelcomePage.jsx` is now `LandingPage.jsx`, and `index.css`/`welcome.css` were
+> replaced by `src/theme/tokens.css` plus `src/styles/*.css`. `chart.js` and
+> `socket.io-client` were also removed from `package.json`. For current state see
+> `THEME.md`, `AGENTS.md`, and `frontend/package.json`. The training-job API and
+> the component responsibilities below are still accurate.
+
 ## 🎉 Project Status: SUCCESSFULLY COMPLETED
 
 The comprehensive ML training interface for the Predictive ICU Monitoring System has been fully implemented, documented, tested, and deployed to the GitHub repository.

@@ -71,12 +71,12 @@ PROJ/
 │   ├── deployed_manifest.json  # Deployed ensemble definition
 │   └── scaler.json   # Train-split normalization stats
 ├── backend/          # FastAPI: ingest, scoring, SHAP explain, training jobs, replay
-├── frontend/         # React 18 + Vite + Tailwind dashboard
+├── frontend/         # React 18 + Vite + plain CSS (see THEME.md for the design system)
 ├── ppt/              # Final deck (SynCura_Deck_V3_FINAL.pptx), figs/metrics.json, script
 ├── discordbot/       # Discord alert bot
 ├── chatbot-tele/     # Telegram chatbot
 ├── firmware/         # IoT firmware
-├── LITERATURE_REVIEW_DOCUMENT.md  # Literature review (v1.3, chronological)
+├── LITERATURE_REVIEW.md # Literature review (current; chronological table + DOIs)
 ├── PROJECT_REPORT.md # Full project report
 └── start-dev.ps1     # Launch backend + frontend together (Windows)
 ```
@@ -100,7 +100,7 @@ python scripts/download_data.py --folder-id <drive-folder-id>   # or set SYNCURA
 | Simulated + Kaggle snapshots | Pipeline benchmarking and tabular baselines only — never clinical evidence | `data/hospital-deterioration-dataset/`, `data/kaggle-*/` |
 | MIMIC-IV full / eICU / HiRID | Credentialed (PhysioNet login + CITI + DUA); **never re-upload — DUAs forbid redistribution** | Each teammate credentials individually |
 
-Full inventory, coverage notes, and rules for adding datasets: **`DATA.md`**.
+Full inventory, coverage notes, and rules for adding datasets: **`DATA.md`**. Column-level schemas for every dataset, the canonical 12-feature table, and the exact proximity-label definition: **`docs/DATASET_SCHEMAS.md`**.
 
 ## Quickstart
 

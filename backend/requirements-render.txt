@@ -1,0 +1,13 @@
+# Slim runtime requirements for Render deployment.
+# Excludes discord.py / httpx / pytest, which the backend never imports at runtime.
+fastapi==0.136.1
+uvicorn==0.46.0
+paho-mqtt==2.1.0
+SQLAlchemy==2.0.49
+python-dotenv==1.2.2
+pandas==2.3.3
+requests==2.33.1
+numpy==2.2.6
+scikit-learn==1.7.2
+# NOTE: CPU-only wheel from the PyTorch index (~200MB vs ~800MB PyPI wheel).
+torch==2.5.1+cpu

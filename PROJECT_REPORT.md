@@ -198,14 +198,16 @@ Key design choices:
 - Computes real-time risk score (0-100)
 - Thread-safe with threading.Lock()
 
-#### 5.2 Frontend (React + Vite + Tailwind)
+#### 5.2 Frontend (React + Vite + plain CSS)
+
+Styled with hand-written CSS against the token system in `src/theme/tokens.css`; there is no Tailwind. See `THEME.md` for the full design system (two display modes: `paper` and `monitor`).
 
 **Pages:**
-- `/` - Landing page with live preview
-- `/dashboard` - Main ICU monitoring dashboard
+- `/` - Landing page with hero film
+- `/dashboard` - Central station (main ICU monitoring dashboard)
 - `/simulated-data` - Tabular vital signs view
 - `/waveforms` - Multi-patient waveform charts
-- `/training` - ML training job management
+- `/training`, `/training/new`, `/training/:jobId` - ML training job management
 - `/architecture` - System architecture docs
 
 **Dashboard Features:**
@@ -409,11 +411,20 @@ PROJ/
 │   ├── training.py            # Training job manager
 │   └── db.py                  # SQLite database
 ├── frontend/
-│   └── src/
-│       ├── App.jsx            # Main dashboard
-│       ├── simulationContext.jsx
-│       └── components/
+│   ├── src/
+│   │   ├── App.jsx            # Router, lazy routes, theme state
+│   │   ├── main.jsx           # Entrypoint + CSS load order
+│   │   ├── simulationContext.jsx
+│   │   ├── theme/tokens.css   # All design tokens
+│   │   ├── styles/            # base, layout, landing, film, station, pages
+│   │   ├── motion/gsap.js     # GSAP + reduced-motion queries
+│   │   └── components/
+│   ├── postcss.config.js      # Autoprefixer only
+│   └── vercel.json            # SPA rewrite
 ├── AGENTS.md                  # AI agent guide
+├── THEME.md                   # Frontend design system
+├── DATA.md                    # Dataset inventory
+├── docs/DATASET_SCHEMAS.md    # Column-level dataset schemas
 ├── LITERATURE_REVIEW.md       # Literature review
 └── PROJECT_REPORT.md          # This file
 ```

@@ -52,15 +52,24 @@ backend/          FastAPI REST API
   replay.py           Replays PhysioNet data into the API over HTTP or MQTT (demo/testing)
   mqtt_subscriber.py  MQTT subscriber for real sensor ingest
 
-frontend/         React 18 + Vite + Tailwind
-  src/App.jsx                 Shell, routing, dashboard layout
-  src/simulationContext.jsx   Client-side simulation engine (12 synthetic patients) — NOT wired to backend
+frontend/         React 18 + Vite + plain CSS (no Tailwind; see THEME.md)
+  index.html                Carries a pre-paint theme script to avoid a light-mode flash
+  src/main.jsx              CSS load order matters: theme/tokens.css first
+  src/App.jsx               Router, lazy routes, theme state (light/dark -> paper/monitor)
+  src/simulationContext.jsx Client-side simulation engine (synthetic) — NOT wired to backend
+  src/theme/tokens.css      All design tokens; only file with hex colour (film.css excepted)
+  src/styles/               base, layout, landing, film, station, pages
+  src/motion/gsap.js        GSAP plugins + REDUCED / MOTION_OK media queries
   src/components/
-    WelcomePage.jsx        Landing page — check for hardcoded stats before trusting them
-    SensorWaveform.jsx     SVG waveform + explainability overlay
+    AppShell.jsx          Top bar, nav, theme switch, skip link
+    LandingPage.jsx       Landing page
+    film/                 HeroFilm.jsx + scenes.js, scroll-driven GSAP
+    Dashboard.jsx         Central station
+    SensorWaveform.jsx    SVG waveform + explainability overlay
+    trace.js              ecgPath, seriesPath, riskTone thresholds (45/70/85)
     TrainingConfig.jsx / TrainingMonitor.jsx / TrainingJobsList.jsx   Training job UI
-    SimulatedDataFeed.jsx  Tabular live-data view
-    ArchitecturePage.jsx   In-app architecture docs
+    SimulatedDataFeed.jsx Tabular live-data view
+    ArchitecturePage.jsx  In-app architecture docs
 
 discordbot/, chatbot-tele/   Discord and Telegram alert bots
 firmware/esp32_max30105/     ESP32 + MAX30105 sensor firmware (publishes over MQTT)
@@ -124,20 +133,33 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 ## Conventions & gotchas
 
 - **Python**: match existing style, no comments unless the logic is genuinely non-obvious.
-- **JS/JSX**: functional components + hooks, Tailwind utility classes.
+- **JS/JSX**: functional components + hooks, styled with the plain CSS in `frontend/src/styles/`. No Tailwind, no CSS-in-JS. Full design system in `THEME.md`.
+- Colour, type, space, radius, and motion all come from `frontend/src/theme/tokens.css`. Never hardcode hex outside that file and `src/styles/film.css` (the hero film is deliberately its own dark stage in both modes).
+- One typeface (Archivo Variable). Change hierarchy with the width axis (`--wide`/`--normal`/`--narrow`), not by adding a family.
+- Animations must register inside `mm.add(MOTION_OK, ...)` using `REDUCED`/`MOTION_OK` from `src/motion/gsap.js`. Never `transition: all`.
+- Risk-tier thresholds live in `src/components/trace.js` (`riskTone`); use it rather than comparing risk numbers inline.
 - No new dependencies without checking what's already in `requirements.txt`/`package.json` first.
 - `RiskScoreEngine` (backend/inference.py) uses `threading.Lock()` — keep any changes thread-safe.
 - Frontend `simulationContext.jsx` is entirely client-side synthetic data; it does **not** read live
   scores back from the backend. Don't assume dashboard numbers reflect real `/scores` output.
-- `WelcomePage.jsx` may have hardcoded model stats — verify against `/metrics` before citing its numbers.
-- `chart.js` and `socket.io-client` are declared in `frontend/package.json` but currently unused.
+- The 12-feature order is duplicated in `ml/train.py` (`SERVING_FEATURES`) and `backend/inference.py`
+  (`FEATURES`), and only cross-checked when `train.py` runs with `--deploy`. A plain run can produce
+  an unservable model — change both if you change features.
 - No automated test suite exists yet (backend or ML).
 - `.env` holds secrets (Discord webhook, etc.) — never print or commit its contents; `.env.example` is the template.
 
 ## Docs already in the repo (read these for depth, this file is the map)
 
+- `THEME.md` — the frontend design system: paper/monitor modes, tokens, type, motion, load order, and the rules that keep it coherent. Read before touching any CSS or component.
+- `DATA.md` — dataset inventory (what lives under `data/`, which is gitignored, and how paths resolve).
+- `docs/DATASET_SCHEMAS.md` — column-level schema for every dataset, the canonical 12-feature table, and the exact proximity-label definition. The dataset's own dictionary is not in this repo.
 - `README.md` — setup/run instructions, feature log of implemented capabilities.
-- `AGENTS.md` — earlier project guide; **feature/window numbers are stale** (says 6 features/60 min), rest is broadly accurate.
-- `PROJECT_REPORT.md` — full mini-project report: base paper, literature review, methodology, results tables (also has some stale numbers — e.g. results section predates the 12-feature run; `ml/metrics.json` is the source of truth for current metrics).
+- `AGENTS.md` — fuller project guide: quick commands, directory map, model architecture, feature table, known issues.
+- `PROJECT_REPORT.md` — full mini-project report: base paper, literature review, methodology, results tables. **Its results section predates the 12-feature run and its frontend section still describes Tailwind**; `ml/metrics.json` and `ml/deployed_manifest.json` are the sources of truth for current metrics, and `THEME.md` for the frontend.
+- `LITERATURE_REVIEW.md` — literature survey with a findings table and DOIs. `LITERATURE_REVIEW_DOCUMENT.md` is an **older, superseded duplicate**; prefer `LITERATURE_REVIEW.md`.
+- `ml/RESULTS_PLAN.md` — experiment rounds, sweep inventory, and the holdout-gating rationale.
+- `ml/deployed_manifest.json` — the served ensemble: members, checkpoints, per-member scaler, features, val/holdout AUC, decision threshold. This is the authority on what is actually in production.
+- `syncura_review.tex` — the LaTeX review paper (IEEE DISCOVER format, XeLaTeX + A4 + Times New Roman).
+- `ppt/` — presentation decks and speaker scripts. `SynCura_Deck_V3_FINAL.pptx` is the current deck; the `SynCura_PACE_Format*` and `SynCura_Deck_V2/V3` files are earlier iterations. Source facts from `ml/metrics.json` and `ml/deployed_manifest.json` rather than figures quoted inside older decks.
 - `LITERATURE_REVIEW.md` — base paper (Wang, Bai & Jin 2026) + 8 supporting papers, with SynCura's positioning (~0.78–0.93 AUC realistic range vs. richer multi-database systems reaching 0.93–0.97).
 - `zulfapp1 (1) (2).pptx` — academic presentation deck for this project (P.A. College of Engineering, CSE dept). Rebuilt 2026-09-14 to reflect the current SynCura content (12-feature model, AUC 0.798, current architecture) — it previously contained an unrelated mushroom-contamination-detection project's slides by mistake. If asked to update it again, source facts from `ml/metrics.json` and this file rather than the stale figures in `PROJECT_REPORT.md`/`AGENTS.md`.
