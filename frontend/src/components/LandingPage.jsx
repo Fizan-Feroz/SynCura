@@ -1,17 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
-import { gsap, useGSAP, MOTION_OK } from '../motion/gsap'
+import { gsap, useGSAP, ScrollTrigger, MOTION_OK } from '../motion/gsap'
 import { TopBar } from './AppShell'
 import { BrandMark, Wordmark } from './Brand'
-import { ecgPath } from './trace'
-
-// Hero geometry (SVG user units; the SVG stretches to full width).
-const W = 1440
-const H = 260
-const BASE = 150
-const TRACE_END = 1000
-const FORECAST = `M${TRACE_END} ${BASE} C1090 ${BASE} 1130 ${BASE - 6} 1190 ${BASE - 40} S1300 70 1360 52`
-const RISK = 64
+import HeroFilm from './film/HeroFilm'
 
 const STEPS = [
   {
@@ -48,108 +40,20 @@ const DESTINATIONS = [
   { to: '/architecture', name: 'Architecture', body: 'The pipeline from sensor to score, the stack, and the limits of this prototype.' },
 ]
 
-function useDriftingVitals() {
-  const [v, setV] = useState({ HR: 88, SpO2: 95, RR: 21, Temp: 37.6 })
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState === 'hidden') return
-      setV((c) => ({
-        HR: Math.max(80, Math.min(104, c.HR + Math.round(Math.random() * 4 - 1.6))),
-        SpO2: Math.max(91, Math.min(97, c.SpO2 + (Math.random() > 0.7 ? -1 : Math.random() > 0.85 ? 1 : 0))),
-        RR: Math.max(18, Math.min(26, c.RR + (Math.random() > 0.75 ? 1 : Math.random() > 0.85 ? -1 : 0))),
-        Temp: Number(Math.max(37.2, Math.min(38.4, c.Temp + (Math.random() - 0.45) * 0.1)).toFixed(1)),
-      }))
-    }, 2200)
-    return () => window.clearInterval(id)
-  }, [])
-  return v
-}
-
 export default function LandingPage({ theme, onToggleTheme }) {
   const root = useRef(null)
-  const riskRef = useRef(null)
-  const vitals = useDriftingVitals()
-  const trace = useMemo(() => ecgPath({ x0: 0, x1: TRACE_END, base: BASE, amp: 92, beats: 7 }), [])
 
-  useGSAP(
-    () => {
-      const mm = gsap.matchMedia()
-      mm.add(MOTION_OK, () => {
-        const path = root.current.querySelector('.hero-trace-line')
-        const pen = root.current.querySelector('.hero-pen')
-        const len = path.getTotalLength()
-
-        // x -> y lookup so the pen can ride the sweep head.
-        const samples = Array.from({ length: 600 }, (_, i) => path.getPointAtLength((i / 599) * len))
-        const yAt = (x) => {
-          let lo = 0
-          let hi = samples.length - 1
-          while (hi - lo > 1) {
-            const mid = (lo + hi) >> 1
-            if (samples[mid].x < x) lo = mid
-            else hi = mid
-          }
-          return samples[hi].y
-        }
-        const placePen = (x, y) => gsap.set(pen, { left: `${(x / W) * 100}%`, top: `${(y / H) * 100}%` })
-
-        gsap.set(path, { strokeDasharray: len, strokeDashoffset: len })
-        gsap.set('.forecast-reveal', { attr: { width: 0 } })
-        gsap.set(pen, { autoAlpha: 1 })
-
-        const counter = { v: 0 }
-        const tl = gsap.timeline({ defaults: { ease: 'power3.out' } })
-        tl.from('.hero-title .line > span', { yPercent: 115, duration: 1.1, stagger: 0.09 })
-          .to(
-            path,
-            {
-              strokeDashoffset: 0,
-              duration: 2.6,
-              ease: 'none',
-              onUpdate() {
-                const p = path.getPointAtLength(len * this.progress())
-                placePen(p.x, p.y)
-              },
-            },
-            0.25
-          )
-          .to('.forecast-reveal', { attr: { width: W - TRACE_END }, duration: 1.3, ease: 'power2.inOut' })
-          .from('.risk-readout', { autoAlpha: 0, y: 10, duration: 0.7 }, '<0.55')
-          .to(
-            counter,
-            {
-              v: RISK,
-              duration: 1.4,
-              ease: 'power2.out',
-              onUpdate: () => {
-                if (riskRef.current) riskRef.current.textContent = Math.round(counter.v)
-              },
-            },
-            '<'
-          )
-          .from('.hero-foot > *', { autoAlpha: 0, y: 18, duration: 0.8, stagger: 0.1 }, 0.9)
-
-        // After the first draw: monitor-style refresh. A gap erases just
-        // ahead of the write head, which rides the trace.
-        tl.add(() => {
-          const gap = root.current.querySelector('.sweep-gap')
-          gsap.set(gap, { autoAlpha: 1 })
-          const head = { x: 0 }
-          gsap.to(head, {
-            x: TRACE_END,
-            duration: 5.2,
-            ease: 'none',
-            repeat: -1,
-            onUpdate: () => {
-              gsap.set(gap, { attr: { x: head.x + 6 } })
-              placePen(head.x, yAt(head.x))
-            },
-          })
-        })
-      })
-    },
-    { scope: root }
-  )
+  // Deep links (e.g. /#how): the browser jumps before the pinned hero adds its
+  // scroll length, landing mid-morph. Re-jump once layout is final.
+  useEffect(() => {
+    const id = window.location.hash.slice(1)
+    if (!id) return undefined
+    const t = window.setTimeout(() => {
+      ScrollTrigger.refresh()
+      document.getElementById(id)?.scrollIntoView()
+    }, 120)
+    return () => window.clearTimeout(t)
+  }, [])
 
   // Scroll: the rail between the four steps fills as you read.
   useGSAP(
@@ -176,67 +80,7 @@ export default function LandingPage({ theme, onToggleTheme }) {
       <TopBar theme={theme} onToggleTheme={onToggleTheme} landing />
 
       <main id="main-content" tabIndex="-1">
-        <header className="hero grid-paper">
-          <div className="hero-copy">
-            <h1 className="hero-title">
-              <span className="line"><span>An early warning,</span></span>
-              <span className="line"><span>read from the last</span></span>
-              <span className="line"><span>90 minutes of vitals.</span></span>
-            </h1>
-          </div>
-
-          <div className="hero-trace">
-            <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-              <defs>
-                <clipPath id="forecast-clip">
-                  <rect className="forecast-reveal" x={TRACE_END} y="0" width={W - TRACE_END} height={H} />
-                </clipPath>
-                <mask id="sweep-mask" maskUnits="userSpaceOnUse" x="0" y="0" width={W} height={H}>
-                  <rect x="0" y="0" width={W} height={H} fill="#fff" />
-                  <rect className="sweep-gap" x="-60" y="0" width="34" height={H} fill="#000" opacity="0" />
-                </mask>
-                <linearGradient id="forecast-band" x1="0" x2="0" y1="0" y2="1">
-                  <stop offset="0%" stopColor="var(--watch)" stopOpacity="0.16" />
-                  <stop offset="55%" stopColor="var(--watch)" stopOpacity="0" />
-                </linearGradient>
-              </defs>
-              <path className="hero-trace-line" d={trace} mask="url(#sweep-mask)" vectorEffect="non-scaling-stroke" />
-              <g clipPath="url(#forecast-clip)">
-                <path className="forecast-band" d={`${FORECAST} L1360 ${H} L${TRACE_END} ${H} Z`} fill="url(#forecast-band)" />
-                <path className="forecast-line" d={FORECAST} vectorEffect="non-scaling-stroke" />
-              </g>
-              <line className="now-line" x1={TRACE_END} x2={TRACE_END} y1="18" y2={H - 12} vectorEffect="non-scaling-stroke" />
-            </svg>
-            <span className="hero-pen" aria-hidden="true" />
-
-            <div className="now-label small">now</div>
-            <div className="risk-readout" role="img" aria-label={`Example deterioration risk ${RISK} percent`}>
-              <span className="risk-readout-label">Deterioration risk</span>
-              <span className="risk-readout-value num">
-                <span ref={riskRef}>{RISK}</span>
-                <small>%</small>
-              </span>
-              <span className="risk-readout-note">Synthetic example</span>
-            </div>
-          </div>
-
-          <div className="hero-foot">
-            <p className="lede">
-              SynCura watches ICU patients the way a nurse scans a monitor, then asks a trained model how
-              likely each one is to deteriorate. It is a research prototype built on PhysioNet ICU data.
-            </p>
-            <div className="hero-actions">
-              <Link to="/dashboard" className="btn btn-primary">Open the central station</Link>
-              <a href="#how" className="btn btn-ghost">How a score is made</a>
-            </div>
-            <dl className="hero-vitals" aria-label="Example patient vitals (synthetic)">
-              <div style={{ '--c': 'var(--hr)' }}><dt>HR</dt><dd className="num">{vitals.HR}</dd></div>
-              <div style={{ '--c': 'var(--spo2)' }}><dt>SpO2</dt><dd className="num">{vitals.SpO2}<small>%</small></dd></div>
-              <div style={{ '--c': 'var(--rr)' }}><dt>RR</dt><dd className="num">{vitals.RR}</dd></div>
-              <div style={{ '--c': 'var(--temp)' }}><dt>Temp</dt><dd className="num">{vitals.Temp.toFixed(1)}<small>°C</small></dd></div>
-            </dl>
-          </div>
-        </header>
+        <HeroFilm />
 
         <section className="section how" id="how" aria-labelledby="how-title">
           <div className="section-head">
