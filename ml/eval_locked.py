@@ -25,12 +25,15 @@ FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
 
 
 def main():
-    if len(sys.argv) != 2:
-        print('usage: python -m ml.eval_locked <candidate_ensemble.json>')
-        raise SystemExit(2)
-    cand = json.load(open(sys.argv[1]))
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('candidate')
+    ap.add_argument('--locked', default=os.path.join('ml', 'locked_holdout.json'))
+    ap.add_argument('--out', default=None)
+    args = ap.parse_args()
+    cand = json.load(open(args.candidate))
     assert cand.get('candidate_only'), 'refusing: not a candidate manifest'
-    locked = json.load(open(os.path.join('ml', 'locked_holdout.json')))
+    locked = json.load(open(args.locked))
     locked_set = set(locked['patients'])
     print(f"locked slice: seed={locked['seed']} n={locked['n_patients']}", flush=True)
 
@@ -43,14 +46,17 @@ def main():
         data, vital_features=FEATURES_12, window_minutes=90, stride=30,
         label_mode='proximity', horizon_hours=12)
 
-    from ml.train_lstm import AttentionLSTMModel
+    from ml.train_lstm import AttentionLSTMModel, AttentionLSTMFusionModel
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    classes = cand.get('model_classes', ['attention'] * len(cand['checkpoints']))
     logits = []
-    for ckpt, scpath in zip(cand['checkpoints'], cand['scalers']):
+    for ckpt, scpath, cls in zip(cand['checkpoints'], cand['scalers'], classes):
         sc = json.load(open(scpath))
         mean, std = np.array(sc['mean']), np.array(sc['std'])
+        n_feat = len(sc.get('features', FEATURES_12))
         Xn = ((np.where(np.isnan(X), mean, X) - mean) / std).astype(np.float32)
-        m = AttentionLSTMModel(input_size=12, hidden_size=96, dropout=0.3)
+        ModelCls = AttentionLSTMFusionModel if cls == 'fusion' else AttentionLSTMModel
+        m = ModelCls(input_size=n_feat, hidden_size=96, dropout=0.3)
         try:
             state = torch.load(ckpt, map_location='cpu', weights_only=True)
         except TypeError:
@@ -67,7 +73,7 @@ def main():
     prob = 1 / (1 + np.exp(-ens))
     pred = (prob > 0.5).astype(int)
     out = {
-        'candidate': sys.argv[1],
+        'candidate': args.candidate,
         'members': cand['members'],
         'locked_seed': locked['seed'],
         'locked_n_patients': locked['n_patients'],
@@ -80,13 +86,14 @@ def main():
         'evaluated_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'note': 'ONE-TIME evaluation. Do not re-run with other configs.',
     }
-    tag = datetime.datetime.now().strftime('%Y%m%d')
-    with open(os.path.join('ml', f'LOCKED_EVAL_{tag}.json'), 'w') as f:
+    default_name = 'LOCKED_EVAL_%s.json' % datetime.datetime.now().strftime('%Y%m%d')
+    out_path = args.out or os.path.join('ml', default_name)
+    with open(out_path, 'w') as f:
         json.dump(out, f, indent=2)
-    # True-positive patients for the Step 4 attention check (IDs only, no tuning).
+    # True-positive patients for the attention check (IDs only, no tuning).
     tp = sorted({p for p, yi, pi in zip(pids, y, prob) if yi == 1 and pi > 0.5})[:10]
     out['tp_patients_for_attention_check'] = tp
-    with open(os.path.join('ml', f'LOCKED_EVAL_{tag}.json'), 'w') as f:
+    with open(out_path, 'w') as f:
         json.dump(out, f, indent=2)
     print('LOCKED RESULT:', {k: (round(v, 4) if isinstance(v, float) else v)
                              for k, v in out.items() if k != 'tp_patients_for_attention_check'}, flush=True)

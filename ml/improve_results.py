@@ -35,10 +35,17 @@ PATIENCE = 14
 MIN_DELTA = 0.0005
 
 CONFIGS = {
-    'baseline': {'gap': False, 'hidden': 96},
-    'gap': {'gap': True, 'hidden': 96},
-    'gap128': {'gap': True, 'hidden': 128},
+    'baseline': {'gap': False, 'hidden': 96, 'model': 'attention'},
+    'gap': {'gap': True, 'hidden': 96, 'model': 'attention'},
+    'gap128': {'gap': True, 'hidden': 128, 'model': 'attention'},
+    'gapfuse': {'gap': True, 'hidden': 96, 'model': 'fusion'},
 }
+
+
+def model_class_for(cfg):
+    from ml import train_lstm
+    return {'attention': train_lstm.AttentionLSTMModel,
+            'fusion': train_lstm.AttentionLSTMFusionModel}[cfg['model']]
 
 
 def feature_names(gap):
@@ -117,8 +124,9 @@ def eval_logits(p, y):
 def train_seed(seed, cfg_name, X_tr, y_tr, X_va, y_va, X_fho, y_fho,
                run_base, epochs=EPOCHS, smoke=False, window=90, horizon=12,
                dropout=0.3, lr=1e-4):
-    from ml.train_lstm import train as quick_train, AttentionLSTMModel
+    from ml.train_lstm import train as quick_train
     cfg = CONFIGS[cfg_name]
+    ModelCls = model_class_for(cfg)
     n_feat = X_tr.shape[-1]
     mean, std = norm_fit(X_tr)
     X_trn, X_van, X_fhon = (norm_apply(X, mean, std) for X in (X_tr, X_va, X_fho))
@@ -129,15 +137,15 @@ def train_seed(seed, cfg_name, X_tr, y_tr, X_va, y_va, X_fho, y_fho,
     pw = int((y_tr == 0).sum()) / max(1, n_pos)
     print(f'  seed {seed} [{cfg_name} w{window} h{horizon} do{dropout} lr{lr}]: '
           f'train {X_trn.shape} dist={np.bincount(y_tr.astype(int))}', flush=True)
-    model = AttentionLSTMModel(input_size=n_feat, hidden_size=cfg['hidden'],
-                               dropout=dropout).to(device)
+    model = ModelCls(input_size=n_feat, hidden_size=cfg['hidden'],
+                          dropout=dropout).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
     best_auc, best_state, patience = 0.0, None, 0
     max_ep = 2 if smoke else epochs
     for epoch in range(max_ep):
         model, optimizer = quick_train(
             X_trn, y_tr, epochs=1, batch_size=128, learning_rate=lr,
-            pos_weight=pw, model_class=AttentionLSTMModel, model=model,
+            pos_weight=pw, model_class=ModelCls, model=model,
             optimizer=optimizer, dropout=dropout, hidden_size=cfg['hidden'],
             weight_decay=1e-4)
         for pg in optimizer.param_groups:
@@ -160,7 +168,7 @@ def train_seed(seed, cfg_name, X_tr, y_tr, X_va, y_va, X_fho, y_fho,
     torch.save(model.state_dict(), os.path.join(out_dir, 'model.pt'))
     np.save(os.path.join(out_dir, 'p_va.npy'), p_va)
     np.save(os.path.join(out_dir, 'p_fho.npy'), p_fho)
-    m = {'config': f'{cfg_name}-causal-seed{seed}', 'features': feature_names(cfg['gap']),
+    m = {'config': f'{cfg_name}-causal-seed{seed}', 'model_class': cfg['model'], 'features': feature_names(cfg['gap']),
          'window': window, 'horizon': horizon, 'dropout': dropout, 'lr': lr,
          'hidden': cfg['hidden'], 'causal': True,
          'train': 'set-a_full(excl orig val) + 80pct set-b' if not smoke else 'smoke subset',
@@ -205,7 +213,7 @@ def run_ensemble(run_dirs, holdout_gate=0.83):
             if not (d.startswith('seed') and os.path.exists(os.path.join(sd, 'p_va.npy'))):
                 continue
             m = json.load(open(os.path.join(sd, 'metrics.json')))
-            fp = (m.get('window', 90), m.get('horizon', 12.0))
+            fp = (m.get('window', 90), m.get('horizon', 12.0), m.get('model_class', 'attention'))
             if fingerprint is None:
                 fingerprint = fp
             if fp != fingerprint:
@@ -251,6 +259,7 @@ def run_ensemble(run_dirs, holdout_gate=0.83):
     out = {'members': chosen,
            'checkpoints': [os.path.join(seeds[s]['dir'], 'model.pt') for s in chosen],
            'scalers': [os.path.join(seeds[s]['dir'], 'scaler.json') for s in chosen],
+           'model_classes': [seeds[s]['metrics'].get('model_class', 'attention') for s in chosen],
            'val_auc': ve['auc'], 'val_accuracy': ve['accuracy'], 'val_recall': ve['recall'],
            'fresh_holdout_auc': he['auc'], 'fresh_holdout_accuracy': he['accuracy'],
            'fresh_holdout_recall': he['recall'],
@@ -343,17 +352,18 @@ def _run(args):
         _, v_idx = next(gss.split(np.zeros(len(val_pids)), np.zeros(len(val_pids)),
                                   groups=np.array(val_pids)))
         val_set = set(np.array(val_pids)[v_idx])
-        # Locked final-validation slice (ml/locked_holdout.json, v5 item #1):
-        # excluded from BOTH training and the reported working holdout, so the
+        # Locked final-validation slices (ml/locked_holdout*.json): excluded
+        # from BOTH training and the reported working holdout, so each
         # end-of-campaign locked evaluation is genuinely untouched.
         locked_set = set()
-        lock_path = os.path.join('ml', 'locked_holdout.json')
-        if os.path.exists(lock_path):
+        import glob as _glob
+        for lock_path in sorted(_glob.glob(os.path.join('ml', 'locked_holdout*.json'))):
             try:
-                locked_set = set(json.load(open(lock_path))['patients'])
-                print(f'locked slice honored: {len(locked_set)} set-b patients excluded', flush=True)
+                locked_set |= set(json.load(open(lock_path))['patients'])
             except Exception as e:
-                print(f'WARNING: could not read locked slice ({e}); proceeding WITHOUT exclusion', flush=True)
+                print(f'WARNING: could not read {lock_path} ({e})', flush=True)
+        if locked_set:
+            print(f'locked slices honored: {len(locked_set)} set-b patients excluded', flush=True)
         pb_arr = np.array(pb)
         tr_mask_b = split_holdout(pb_arr) & np.array([p not in locked_set for p in pb_arr])
         ho_mask_b = ~split_holdout(pb_arr) & np.array([p not in locked_set for p in pb_arr])
@@ -373,6 +383,14 @@ def _run(args):
         np.save(os.path.join(run_base, 'y_fho.npy'), y_fho)
         results = []
         for seed in args.seeds:
+            done_marker = os.path.join(run_base, f'seed{seed}', 'metrics.json')
+            ckpt_marker = os.path.join(run_base, f'seed{seed}', 'model.pt')
+            if os.path.exists(done_marker) and os.path.exists(ckpt_marker):
+                m = json.load(open(done_marker))
+                print(f"  seed {seed}: SKIPPED (done: val={m['val_auc']:.4f} "
+                      f"fresh-holdout={m['fresh_holdout_auc']:.4f})", flush=True)
+                results.append((seed, m))
+                continue
             results.append((seed, train_seed(seed, cfg_name, X_tr, y_tr, Xva, yva,
                                             X_fho, y_fho, run_base, smoke=args.smoke,
                                             window=args.window, horizon=args.horizon,

@@ -92,6 +92,65 @@ class AttentionLSTMModel(nn.Module):
         return attn_weights.squeeze(-1)  # (batch, seq)
 
 
+class AttentionLSTMFusionModel(nn.Module):
+    """AttentionLSTM with multiplicative value x feature fusion at the input
+    (MedFuse-inspired; fully causal and streaming-safe).
+
+    Each scalar measurement is embedded (shared value projection) and fused
+    multiplicatively with a learned per-feature identity embedding before
+    entering the LSTM. Same attention tail and API as AttentionLSTMModel.
+    """
+    def __init__(self, input_size, hidden_size=64, num_layers=2, dropout=0.3,
+                 bidirectional=False, embed_dim=8):
+        super().__init__()
+        self.bidirectional = bidirectional
+        self.hidden_size = hidden_size
+        self.embed_dim = embed_dim
+        self.value_proj = nn.Linear(1, embed_dim)
+        self.feature_emb = nn.Parameter(torch.randn(input_size, embed_dim) * 0.1)
+        fused_in = input_size * embed_dim
+        self.input_proj = nn.Linear(fused_in, hidden_size)
+        self.lstm = nn.LSTM(
+            hidden_size, hidden_size, num_layers,
+            batch_first=True,
+            dropout=dropout if num_layers > 1 else 0.0,
+            bidirectional=bidirectional,
+        )
+        ctx = hidden_size * (2 if bidirectional else 1)
+        self.attention = nn.Sequential(
+            nn.Linear(ctx, ctx),
+            nn.Tanh(),
+            nn.Linear(ctx, 1)
+        )
+        self.dropout = nn.Dropout(dropout)
+        self.batch_norm = nn.BatchNorm1d(ctx)
+        self.fc = nn.Linear(ctx, 1)
+
+    def _encode(self, x):
+        v = self.value_proj(x.unsqueeze(-1))          # (B, T, F, d)
+        f = self.feature_emb.unsqueeze(0).unsqueeze(0)  # (1, 1, F, d)
+        fused = (v * f).flatten(start_dim=2)           # (B, T, F*d)
+        return self.input_proj(fused)                  # (B, T, H)
+
+    def forward(self, x):
+        h = self._encode(x)
+        lstm_out, _ = self.lstm(h)
+        attn_scores = self.attention(lstm_out)
+        attn_weights = torch.softmax(attn_scores, dim=1)
+        context = torch.sum(attn_weights * lstm_out, dim=1)
+        context = self.dropout(context)
+        context = self.batch_norm(context)
+        out = self.fc(context)
+        return out.squeeze(-1)
+
+    def get_attention_weights(self, x):
+        """Return per-timestep attention weights for interpretability."""
+        lstm_out, _ = self.lstm(self._encode(x))
+        attn_scores = self.attention(lstm_out)
+        attn_weights = torch.softmax(attn_scores, dim=1)
+        return attn_weights.squeeze(-1)  # (batch, seq)
+
+
 def train(
     X,
     y,

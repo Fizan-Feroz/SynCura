@@ -24,8 +24,17 @@ TEST_SIZE = 0.10
 
 
 def main():
-    if os.path.exists(OUT):
-        print(f'{OUT} already exists — refusing to re-carve (that would invalidate the lock).')
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--seed', type=int, default=LOCK_SEED)
+    ap.add_argument('--out', default=OUT)
+    ap.add_argument('--frac', type=float, default=TEST_SIZE)
+    ap.add_argument('--exclude', nargs='*', default=[],
+                    help='locked JSON files whose patients must NOT be re-carved')
+    args = ap.parse_args()
+    OUT_P, SEED, FRAC = args.out, args.seed, args.frac
+    if os.path.exists(OUT_P):
+        print(f'{OUT_P} already exists — refusing to re-carve (that would invalidate the lock).')
         raise SystemExit(2)
     from ml.dataset import load_physionet_batch
     data = load_physionet_batch(
@@ -33,23 +42,29 @@ def main():
         os.path.join(BASE, 'Outcomes-b.txt'))
     pids = np.array([pid for _, _, pid in data])
     upb = np.unique(pids)
-    gss = GroupShuffleSplit(n_splits=1, test_size=TEST_SIZE, random_state=LOCK_SEED)
-    _, lock_idx = next(gss.split(np.zeros(len(upb)), np.zeros(len(upb)), groups=upb))
-    locked = sorted(upb[lock_idx].tolist())
+    excluded = set()
+    for ef in args.exclude:
+        excluded |= set(json.load(open(ef))['patients'])
+    pool = np.array([p for p in upb if p not in excluded])
+    print(f'pool after exclusions: {len(pool)}/{len(upb)}', flush=True)
+    gss = GroupShuffleSplit(n_splits=1, test_size=FRAC, random_state=SEED)
+    _, lock_idx = next(gss.split(np.zeros(len(pool)), np.zeros(len(pool)), groups=pool))
+    locked = sorted(pool[lock_idx].tolist())
     payload = {
-        'seed': LOCK_SEED,
-        'test_size': TEST_SIZE,
+        'seed': SEED,
+        'test_size': FRAC,
         'n_patients': len(locked),
         'n_setb_patients': len(upb),
+        'n_excluded': len(excluded),
         'patients': locked,
         'created_utc': datetime.datetime.now(datetime.timezone.utc).isoformat(),
         'purpose': ('FINAL validation only. No training, no hyperparameter/ensemble/early-'
                     'stopping gating, evaluated exactly once via ml/eval_locked.py.'),
         'rule': 'distinct from val seed 42 and working-holdout seed 123',
     }
-    with open(OUT, 'w') as f:
+    with open(OUT_P, 'w') as f:
         json.dump(payload, f, indent=2)
-    print(f'locked {len(locked)}/{len(upb)} set-b patients -> {OUT}', flush=True)
+    print(f'locked {len(locked)}/{len(upb)} set-b patients -> {OUT_P}', flush=True)
 
 
 if __name__ == '__main__':
