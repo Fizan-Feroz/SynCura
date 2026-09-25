@@ -376,10 +376,8 @@ def start_training(config: TrainingConfig):
 @app.get("/training/jobs")
 def list_training_jobs():
     """Get all training jobs with their current status."""
-    all_jobs = training_manager.get_all_jobs()
-    return {
-        "jobs": [job.to_dict() for job in all_jobs]
-    }
+    # get_all_jobs() already returns serialized dicts.
+    return {"jobs": training_manager.get_all_jobs()}
 
 
 @app.get("/training/{job_id}")

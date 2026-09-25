@@ -1,204 +1,91 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import axios from 'axios'
+import { API_URL } from '../api'
+
+export function JobStatus({ status }) {
+  const tone = { pending: 'watch', running: 'info', completed: 'stable', failed: 'critical' }[status] || 'watch'
+  return <span className={`job-status job-${tone}`} role="status">{status}</span>
+}
 
 export default function TrainingJobsList() {
-  const navigate = useNavigate();
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+  const [jobs, setJobs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    const fetchJobs = async () => {
+    const load = async () => {
       try {
-        const response = await axios.get(`${apiUrl}/training/jobs`);
-        setJobs(response.data.jobs);
-        setLoading(false);
+        const res = await axios.get(`${API_URL}/training/jobs`)
+        setJobs([...res.data.jobs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))))
+        setError(null)
       } catch (err) {
-        setError(err.response?.data?.detail || err.message);
-        setLoading(false);
+        setError(err.response?.data?.detail || err.message)
+      } finally {
+        setLoading(false)
       }
-    };
-
-    fetchJobs();
-    
-    // Refresh every 3 seconds
-    const interval = setInterval(fetchJobs, 3000);
-    return () => clearInterval(interval);
-  }, [apiUrl]);
-
-  const statusColors = {
-    pending: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-    running: 'bg-blue-100 text-blue-800 border-blue-300',
-    completed: 'bg-green-100 text-green-800 border-green-300',
-    failed: 'bg-red-100 text-red-800 border-red-300'
-  };
-
-  if (loading) {
-    return (
-      <div className="training-page min-h-screen p-8" role="status" aria-live="polite">
-        <div className="training-content max-w-6xl mx-auto">
-          <div className="training-loading animate-pulse space-y-4">
-            <div className="h-8 bg-gray-300 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-300 rounded"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+    }
+    load()
+    const id = setInterval(load, 3000)
+    return () => clearInterval(id)
+  }, [])
 
   return (
-    <div className="training-page min-h-screen p-8">
-      <div className="training-content max-w-6xl mx-auto">
-        <div className="training-panel bg-white rounded-lg shadow-lg p-8">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">Training Jobs</h1>
-              <p className="text-gray-600 mt-1">Manage and monitor your ML training jobs</p>
-            </div>
-            <button
-              onClick={() => navigate('/training/new')}
-              className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
-            >
-              New Training Job
-            </button>
-          </div>
-
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg" role="alert">
-              <p className="text-red-800">{error}</p>
-            </div>
-          )}
-
-          {jobs.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-600 mb-4">No training jobs yet</p>
-              <button
-                onClick={() => navigate('/training/new')}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Create First Training Job
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {jobs.map(job => {
-                const progress = job.total_epochs > 0 
-                  ? Math.round((job.current_epoch / job.total_epochs) * 100)
-                  : 0;
-                
-                return (
-                  <div
-                    key={job.job_id}
-                    onClick={() => navigate(`/training/${job.job_id}`)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') navigate(`/training/${job.job_id}`)
-                      if (event.key === ' ') {
-                        event.preventDefault()
-                        navigate(`/training/${job.job_id}`)
-                      }
-                    }}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Open training job ${job.job_id.slice(0, 8)}`}
-                    className="p-6 border border-gray-200 rounded-lg hover:shadow-md hover:border-blue-300 cursor-pointer transition"
-                  >
-                    <div className="flex items-center justify-between mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-800">
-                          Job {job.job_id.slice(0, 8)}
-                        </h3>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Started: {new Date(job.created_at).toLocaleString()}
-                        </p>
-                      </div>
-                      <div className={`px-4 py-2 rounded-lg border-2 font-semibold capitalize ${statusColors[job.status]}`} role="status">
-                        {job.status}
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase">Epochs</p>
-                        <p className="text-lg font-semibold text-gray-800">
-                          {job.current_epoch}/{job.total_epochs}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase">Progress</p>
-                        <p className="text-lg font-semibold text-blue-600">{progress}%</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-600 uppercase">Config</p>
-                        <p className="text-sm text-gray-800">
-                          {job.config?.epochs} epochs, {job.config?.batch_size} batch size
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Progress Bar */}
-                    <div className="mb-4">
-                      <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="bg-gradient-to-r from-blue-500 to-indigo-600 h-full rounded-full transition-all"
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
-                    </div>
-
-                    {/* Metrics Preview */}
-                    {job.metrics && Object.keys(job.metrics).length > 0 && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                        {job.metrics.train_loss != null && (
-                          <div className="bg-orange-50 p-2 rounded">
-                            <p className="text-xs text-gray-600">Loss</p>
-                            <p className="font-semibold text-orange-600">
-                              {job.metrics.train_loss.toFixed(4)}
-                            </p>
-                          </div>
-                        )}
-                        {job.metrics.val_accuracy != null && (
-                          <div className="bg-blue-50 p-2 rounded">
-                            <p className="text-xs text-gray-600">Val Acc</p>
-                            <p className="font-semibold text-blue-600">
-                              {(job.metrics.val_accuracy * 100).toFixed(1)}%
-                            </p>
-                          </div>
-                        )}
-                        {job.metrics.auc != null && (
-                          <div className="bg-green-50 p-2 rounded">
-                            <p className="text-xs text-gray-600">AUC</p>
-                            <p className="font-semibold text-green-600">
-                              {job.metrics.auc.toFixed(4)}
-                            </p>
-                          </div>
-                        )}
-                        {job.metrics.accuracy != null && (
-                          <div className="bg-purple-50 p-2 rounded">
-                            <p className="text-xs text-gray-600">Acc</p>
-                            <p className="font-semibold text-gray-800">
-                              {(job.metrics.accuracy * 100).toFixed(1)}%
-                            </p>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {job.error_message && (
-                      <div className="mt-4 p-2 bg-red-50 border border-red-200 rounded">
-                        <p className="text-xs text-red-800">{job.error_message}</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+    <div className="page">
+      <header className="page-head">
+        <div>
+          <h1>Training jobs</h1>
+          <p className="muted">Each job trains in the background and saves its own model file. Refreshes every three seconds.</p>
         </div>
-      </div>
+        <div className="page-actions">
+          <Link to="/training/new" className="btn btn-primary btn-sm">New training job</Link>
+        </div>
+      </header>
+
+      {error && (
+        <p className="notice notice-error" role="alert">
+          Could not reach the backend ({error}). Start it with <code>uvicorn backend.app:app</code> and this list will load.
+        </p>
+      )}
+
+      {loading ? (
+        <div className="skeleton" role="status"><span className="sr-only">Loading jobs</span></div>
+      ) : jobs.length === 0 && !error ? (
+        <div className="empty">
+          <h2>No training jobs yet</h2>
+          <p className="muted">Point a job at your PhysioNet files to train a model and watch its metrics arrive.</p>
+          <Link to="/training/new" className="btn btn-primary">Start the first job</Link>
+        </div>
+      ) : (
+        <ul className="jobs">
+          {jobs.map((job) => {
+            const progress = job.total_epochs > 0 ? Math.round((job.current_epoch / job.total_epochs) * 100) : 0
+            const m = job.metrics || {}
+            return (
+              <li key={job.job_id}>
+                <Link to={`/training/${job.job_id}`} className="job">
+                  <span className="job-main">
+                    <span className="job-name">{job.job_id.replace(/^job_/, '')}</span>
+                    <span className="muted small">
+                      {job.created_at ? new Date(job.created_at).toLocaleString() : 'Unknown start'}
+                    </span>
+                  </span>
+                  <JobStatus status={job.status} />
+                  <span className="job-progress" aria-label={`Epoch ${job.current_epoch} of ${job.total_epochs}`}>
+                    <span className="num">{job.current_epoch}/{job.total_epochs}</span>
+                    <span className="progress"><span style={{ '--p': progress / 100 }} /></span>
+                  </span>
+                  <span className="job-metrics num">
+                    {m.auc != null && <span>AUC {m.auc.toFixed(3)}</span>}
+                    {m.train_loss != null && <span>Loss {m.train_loss.toFixed(4)}</span>}
+                  </span>
+                  {job.error_message && <span className="job-error small">{job.error_message}</span>}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
-  );
+  )
 }

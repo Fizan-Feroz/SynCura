@@ -600,3 +600,21 @@ def test_train_batches_from_single_tensor():
     assert len(losses) == 2 and all(np.isfinite(losses))
     model2, _ = train(X, y, epochs=1, batch_size=16, device='cpu', model=model, optimizer=opt)
     assert model2 is model, 'continuing training must reuse the same model'
+
+
+def test_training_jobs_endpoints(tmp_path, monkeypatch):
+    # Regression: GET /training/jobs called .to_dict() on dicts -> 500 on every request.
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    import backend.training as t
+    monkeypatch.setattr(t, 'JOBS_STORE', str(tmp_path / 'jobs.json'))
+    monkeypatch.setattr(app_module.training_manager, 'jobs', {})
+    client = TestClient(app_module.app)
+    assert client.get('/training/jobs').json() == {'jobs': []}
+    job = app_module.training_manager.create_job({'epochs': 3})
+    body = client.get('/training/jobs').json()
+    assert [j['job_id'] for j in body['jobs']] == [job.job_id]
+    assert body['jobs'][0]['total_epochs'] == 3
+    detail = client.get(f'/training/{job.job_id}')
+    assert detail.status_code == 200 and detail.json()['job_id'] == job.job_id
+    assert client.get('/training/missing').status_code == 404

@@ -1,9 +1,19 @@
 <!doctype html>
-<html>
+<html lang="en" data-theme="paper">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ICU Dashboard</title>
+    <meta name="description" content="SynCura: an ICU early-warning research prototype that scores deterioration risk from the last 90 minutes of vitals." />
+    <title>SynCura</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      // Apply the saved display mode before first paint (no flash).
+      try {
+        var t = localStorage.getItem('syncura-theme')
+        if (!t && window.matchMedia('(prefers-color-scheme: dark)').matches) t = 'dark'
+        document.documentElement.dataset.theme = t === 'dark' ? 'monitor' : 'paper'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

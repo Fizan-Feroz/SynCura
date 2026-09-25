@@ -1,0 +1,684 @@
+<!doctype html>
+<html lang="en" data-resolution="landscape">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=1920, height=1080" />
+<title>SynCura — Cobalt Grid Deck</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;1,6..72,400&family=Hanken+Grotesk:wght@400;600&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+:root{
+  --paper:#F0EBDE; --paper-2:#E6E0CE; --ink:#1F2BE0; --ink-soft:#5560E5;
+  --grid:rgba(31,43,224,.10); --ink-faint:rgba(31,43,224,.18);
+  --serif:"Newsreader",Georgia,serif; --sans:"Hanken Grotesk",sans-serif; --mono:"DM Mono",ui-monospace,monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#0c0c14}
+#stage{position:absolute;top:0;left:0;width:1920px;height:1080px;transform-origin:top left}
+.frame{position:absolute;top:0;left:0;opacity:0;visibility:hidden;pointer-events:none}
+.frame.is-active{opacity:1;visibility:visible;pointer-events:auto}
+#pager-nav{position:fixed;left:50%;bottom:14px;transform:translateX(-50%);display:flex;justify-content:center;align-items:center;gap:14px;z-index:9999;font-family:"DM Mono",monospace;font-size:13px;color:#F0EBDE;background:#0B1C38;padding:8px 16px}
+#pager-nav button{background:#1F2BE0;color:#F0EBDE;border:none;width:34px;height:34px;cursor:pointer;font-family:inherit;font-size:16px;line-height:1}
+#pager-nav button:hover{background:#5560E5}
+#pager-nav button:disabled{opacity:.35;cursor:default}
+#pager-count{min-width:64px;text-align:center}
+.frame{
+  width:1920px; height:1080px; overflow:hidden;
+  container-type:size; background:var(--paper); color:var(--ink); font-family:var(--sans);
+  background-image:linear-gradient(to right,var(--grid) 1px,transparent 1px),linear-gradient(to bottom,var(--grid) 1px,transparent 1px);
+  background-size:2cqw 2cqw;
+}
+.frame .ht{position:absolute;left:4cqw;right:4cqw;top:3cqw;height:.14cqw;background:var(--ink);z-index:5}
+.frame .hb{position:absolute;left:4cqw;right:4cqw;bottom:3cqw;height:.14cqw;background:var(--ink);z-index:5}
+.frame .pg{position:absolute;right:4cqw;bottom:4cqw;font-family:var(--mono);font-size:1cqw;letter-spacing:.05em;z-index:6}
+.frame .lab{position:absolute;left:4cqw;bottom:4cqw;font-family:var(--mono);font-size:1cqw;letter-spacing:.05em;z-index:6}
+.frame>.body{position:absolute;inset:0;z-index:4}
+
+/* glitch + qr */
+.glitch{position:absolute;top:0;bottom:0;display:flex;flex-direction:column;justify-content:center;gap:0;pointer-events:none;z-index:2}
+.glitch .step{background-image:repeating-linear-gradient(90deg,var(--ink) 0 2px,transparent 2px 8px);background-color:var(--paper)}
+.qr{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);gap:.2cqw;background:var(--paper);padding:.4cqw;box-shadow:0 0 0 .12cqw var(--paper);z-index:6}
+.qr i{background:var(--grid)}
+.qr i.on{background:var(--ink)}
+
+/* type ramp */
+.serif{font-family:var(--serif);font-weight:400}
+.t-hero{font-family:var(--serif);font-size:10.4cqw;line-height:.9;letter-spacing:-.008em}
+.t-closing{font-family:var(--serif);font-size:9.4cqw;line-height:.96;letter-spacing:-.005em}
+.t-quote{font-family:var(--serif);font-size:5.4cqw;line-height:1.08;letter-spacing:-.005em}
+.t-chapter{font-family:var(--serif);font-size:6.6cqw;line-height:1;letter-spacing:-.005em}
+.t-hidx{font-family:var(--serif);font-size:4.4cqw;line-height:1;white-space:nowrap}
+.t-headline{font-family:var(--serif);font-size:4cqw;line-height:1.02}
+.t-ed{font-family:var(--serif);font-style:italic;font-size:2.4cqw;line-height:1.2;color:var(--ink-soft)}
+.t-rowname{font-family:var(--serif);font-size:2.2cqw;line-height:1.08}
+.t-numeral{font-family:var(--serif);font-size:11cqw;line-height:.9;letter-spacing:-.015em}
+.t-body{font-family:var(--sans);font-size:1.05cqw;line-height:1.55}
+.t-body-lg{font-family:var(--sans);font-size:1.3cqw;line-height:1.5}
+.micro{font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.16em;font-size:1.05cqw}
+.mono-tag{font-family:var(--mono);font-size:1.05cqw;letter-spacing:.05em}
+.mono-sm{font-family:var(--mono);font-size:13px;letter-spacing:.05em}
+
+/* ===== COVER (hero) ===== */
+.f-cover .body{display:flex;flex-direction:column;justify-content:center;padding:0 5cqw}
+.f-cover .top{position:absolute;top:5.5cqw;left:5cqw;right:5cqw;display:flex;justify-content:space-between}
+.f-cover .kick{font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.2cqw;font-size:1.15cqw;margin-bottom:1.6cqw}
+.f-cover h1{max-width:62cqw}
+.f-cover .ed{margin-top:1.6cqw;max-width:52cqw}
+.f-cover .team{position:absolute;left:5cqw;bottom:6.5cqw;display:flex;gap:5cqw}
+.f-cover .team .grp b{display:block;font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.16em;font-size:.85cqw;color:var(--ink);margin-bottom:.7cqw}
+.f-cover .team .grp div.nm{font-family:var(--mono);font-size:1cqw;line-height:1.7}
+.f-cover .glitch{right:0;width:24cqw;z-index:2;opacity:.7}
+.f-cover .qr{position:absolute;top:7.8cqw;right:5cqw;width:8cqw;height:8cqw;z-index:6}
+
+/* ===== CHAPTER OPENER (sparse) ===== */
+.f-chapter .body{display:flex;flex-direction:column;justify-content:center;padding:0 6cqw}
+.f-chapter .ix{font-family:var(--mono);font-size:1.2cqw;margin-bottom:1.8cqw;letter-spacing:.05em}
+.f-chapter h3{max-width:80cqw}
+.f-chapter .lede{font-family:var(--sans);font-size:1.3cqw;line-height:1.5;color:var(--ink);max-width:42cqw;margin-top:2cqw}
+.f-chapter .glitch{left:0;width:13cqw;z-index:2;opacity:.5}
+
+/* ===== INDEX LEDGER (dense list) ===== */
+.f-ledger .body{padding:7cqw 5cqw 6cqw;display:flex;flex-direction:column}
+.f-ledger .tb{display:flex;justify-content:space-between;align-items:baseline;border-bottom:.14cqw solid var(--ink);padding-bottom:.9cqw;margin-bottom:1.6cqw}
+.f-ledger .tb .h{white-space:nowrap}
+.f-ledger .rows{display:flex;flex-direction:column}
+.f-ledger .r{display:grid;grid-template-columns:3.6cqw 16cqw 1fr auto;gap:1.6cqw;padding:1.05cqw 0;border-bottom:.06cqw solid var(--ink-faint);align-items:baseline}
+.f-ledger .r:last-child{border-bottom:none}
+.f-ledger .r .n{font-family:var(--mono);font-size:1.05cqw}
+.f-ledger .r .nm{font-family:var(--serif);font-size:1.75cqw;line-height:1.1}
+.f-ledger .r .dx{font-family:var(--sans);font-size:1.02cqw;color:var(--ink);line-height:1.45}
+.f-ledger .r .dl{font-family:var(--mono);font-size:1.02cqw;text-align:right;white-space:nowrap}
+
+/* ===== DIAGRAM (custom, flat boxes) ===== */
+.f-diagram .body{padding:7cqw 5cqw 6cqw;display:flex;flex-direction:column}
+.f-diagram .tb{display:flex;justify-content:space-between;align-items:baseline;border-bottom:.14cqw solid var(--ink);padding-bottom:.9cqw;margin-bottom:3cqw}
+.dbox{border:.12cqw solid var(--ink);padding:1.4cqw 1.2cqw;background:var(--paper)}
+.dbox .dt{font-family:var(--serif);font-size:1.6cqw;line-height:1.1;margin-bottom:.6cqw}
+.dbox .dd{font-family:var(--mono);font-size:.85cqw;line-height:1.5;color:var(--ink)}
+.darrow{font-family:var(--mono);font-size:1.6cqw;display:flex;align-items:center;justify-content:center;color:var(--ink-soft)}
+.dflow{display:flex;align-items:stretch;gap:0}
+.dnote{margin-top:auto;padding-top:2cqw;font-family:var(--sans);font-size:1.05cqw;line-height:1.55;max-width:80cqw}
+
+/* ===== DATA FRAME (pixel-stack) ===== */
+.f-data .body{padding:7cqw 5cqw 6cqw;display:flex;flex-direction:column}
+.f-data .tb{display:flex;justify-content:space-between;align-items:baseline;border-bottom:.14cqw solid var(--ink);padding-bottom:.9cqw;margin-bottom:2.4cqw}
+.f-data .chart{display:flex;align-items:flex-end;gap:1.6cqw;flex:1;border-bottom:.14cqw solid var(--ink)}
+.f-data .st{display:flex;flex-direction:column-reverse;gap:.35cqw;flex:1}
+.f-data .st .c{height:1.5cqw;background:var(--grid)}
+.f-data .st .c.on{background:var(--ink)}
+.f-data .tk{display:flex;gap:1.6cqw;margin-top:1cqw}
+.f-data .tk span{flex:1;text-align:center;font-family:var(--mono);font-size:.95cqw}
+.f-data .side{position:absolute;right:5cqw;top:7cqw;width:26cqw;text-align:right}
+
+/* ===== MANIFESTO / QUOTE (sparse, centered) ===== */
+.f-quote .body{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 12cqw}
+.f-quote .kick{font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.18em;font-size:1.1cqw;margin-bottom:2cqw;color:var(--ink-soft)}
+.f-quote .rule{width:6cqw;height:.14cqw;background:var(--ink);margin:2cqw auto 0}
+.f-quote .byline{font-family:var(--mono);font-size:1cqw;margin-top:1cqw;letter-spacing:.05em}
+
+/* ===== COLOPHON (closer) ===== */
+.f-colo .body{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;text-align:right;padding:0 6cqw}
+.f-colo .kick{font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.18em;font-size:1.1cqw;margin-bottom:1.6cqw;color:var(--ink-soft)}
+.f-colo .glitch{left:0;width:13cqw;z-index:2;opacity:.5}
+.f-colo .credits{position:absolute;left:6cqw;right:6cqw;bottom:6.5cqw;display:flex;gap:4cqw}
+.f-colo .credits .c b{display:block;font-family:var(--sans);font-weight:600;text-transform:uppercase;letter-spacing:.16em;font-size:.8cqw;color:var(--ink);margin-bottom:.6cqw}
+.f-colo .credits .c div{font-family:var(--mono);font-size:.95cqw;line-height:1.6;text-align:left}
+
+/* ===== REFERENCES (dense text list) ===== */
+.f-refs .body{padding:7cqw 5cqw 6cqw;display:flex;flex-direction:column}
+.f-refs .tb{display:flex;justify-content:space-between;align-items:baseline;border-bottom:.14cqw solid var(--ink);padding-bottom:.9cqw;margin-bottom:2cqw}
+.f-refs .rl{display:grid;grid-template-columns:2.2cqw 1fr;gap:1.4cqw;padding:.62cqw 0;border-bottom:.06cqw solid var(--ink-faint);align-items:baseline}
+.f-refs .rl .n{font-family:var(--mono);font-size:.95cqw}
+.f-refs .rl .t{font-family:var(--sans);font-size:.98cqw;line-height:1.4}
+</style>
+</head>
+<body>
+<div id="stage" data-composition-id="stage" data-width="1920" data-height="1080">
+
+<script type="application/hyperframes-slideshow+json">
+{
+  "slides": [
+    { "sceneId": "cover", "notes": "Title. Name yourself, name the guide, pause a beat before Abstract." },
+    { "sceneId": "abstract", "notes": "Read the pull-quote slowly — it is the whole project in one breath." },
+    { "sceneId": "chapter-intro", "notes": "Section marker only — move fast." },
+    { "sceneId": "intro-context", "notes": "Land on the ICU mortality stat first, then NEWS2's limits." },
+    { "sceneId": "architecture", "notes": "Trace the diagram left to right: sources -> API -> model -> dashboard/alerts." },
+    { "sceneId": "chapter-litreview", "notes": "Section marker." },
+    { "sceneId": "litreview-1", "notes": "Base paper first — Wang, Bai & Jin. Then the four comparables." },
+    { "sceneId": "litreview-2", "notes": "End on the positioning line — honest about where SynCura sits." },
+    { "sceneId": "problem-statement", "notes": "Single strong statement — do not read it flat." },
+    { "sceneId": "objectives", "notes": "Five objectives, in delivery order." },
+    { "sceneId": "chapter-methodology", "notes": "Section marker." },
+    { "sceneId": "dataset-preprocessing", "notes": "12 features — call out the 6 new lab values added this round." },
+    { "sceneId": "model-architecture", "notes": "Walk the block diagram left to right." },
+    { "sceneId": "training-strategy", "notes": "Emphasize the grid search — 30+ configs, 5 rounds." },
+    { "sceneId": "chapter-implementation", "notes": "Section marker." },
+    { "sceneId": "backend-api", "notes": "Point out /explain — that is the differentiator vs a plain classifier." },
+    { "sceneId": "frontend-dashboard", "notes": "Mention scenario simulation is client-side only, per Known Issues later." },
+    { "sceneId": "explainability", "notes": "SpO2 and RespRate dominate — matches clinical intuition, say so." },
+    { "sceneId": "chapter-results", "notes": "Section marker." },
+    { "sceneId": "results-auc", "notes": "0.601 to 0.798 — name the two levers: 12 features, 90-min window." },
+    { "sceneId": "results-news2", "notes": "Lead time 1-6h is the clinical headline of this slide." },
+    { "sceneId": "known-issues", "notes": "Be candid — the inference/model mismatch is the most important one." },
+    { "sceneId": "conclusion", "notes": "Close firm. This is a scoped, honest result, not an overclaim." },
+    { "sceneId": "future-scope", "notes": "Six directions — don't dwell, this is a look-ahead slide." },
+    { "sceneId": "references", "notes": "Skip on a tight clock; leave up during Q&A." },
+    { "sceneId": "colophon", "notes": "Thank the guide by name. Open the floor." }
+  ],
+  "slideSequences": []
+}
+</script>
+
+<!-- 01 :: COVER -->
+<div id="cover" class="frame f-cover" data-composition-id="cover" data-start="0" data-duration="2" data-label="Cover" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:58%;height:18%;align-self:flex-end"></div>
+    <div class="step" style="width:100%;height:16%;align-self:flex-end"></div>
+    <div class="step" style="width:42%;height:14%;align-self:flex-end"></div>
+    <div class="step" style="width:76%;height:20%;align-self:flex-end"></div>
+  </div>
+  <div class="qr">
+    <i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i>
+    <i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i>
+    <i class="on"></i><i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i>
+    <i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i>
+    <i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i>
+    <i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i><i></i><i class="on"></i>
+    <i class="on"></i><i></i><i class="on"></i><i class="on"></i><i></i><i class="on"></i><i></i><i></i>
+    <i></i><i class="on"></i><i></i><i></i><i class="on"></i><i></i><i class="on"></i><i class="on"></i>
+  </div>
+  <div class="top">
+    <span class="mono-tag">P.A. COLLEGE OF ENGINEERING / DEPT. OF CSE</span>
+    <span class="mono-tag">VOL.01 — 2026</span>
+  </div>
+  <div class="body">
+    <div class="kick">Predictive ICU Monitoring · Deep Learning</div>
+    <h1 class="t-hero serif">SynCura</h1>
+    <div class="t-ed">Attention-based LSTM patient-deterioration risk, with real-time explainability.</div>
+  </div>
+  <div class="team">
+    <div class="grp">
+      <b>Team</b>
+      <div class="nm">Rafan Ahamad Sheik — 4PA23CS102</div>
+      <div class="nm">Ullas K R — 4PA23CS119</div>
+      <div class="nm">Vijeth — 4PA23CS120</div>
+      <div class="nm">Yousuf Ihsan — 4PA23CS121</div>
+    </div>
+    <div class="grp">
+      <b>Guidance</b>
+      <div class="nm">Prof. Habeeb UR Rehman</div>
+      <div class="nm">Assistant Professor, PACE</div>
+    </div>
+  </div>
+  <div class="pg">01 / 26</div>
+</div>
+
+<!-- 02 :: ABSTRACT (quote) -->
+<div id="abstract" class="frame f-quote" data-composition-id="abstract" data-start="2" data-duration="2" data-label="Abstract" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="kick">Abstract</div>
+    <div class="t-quote serif">A real-time ICU monitor that scores deterioration risk from a rolling window of vitals and labs — and shows its work.</div>
+    <div class="rule"></div>
+    <div class="byline">ATTENTIONLSTM · FASTAPI · REACT · SHAP + ATTENTION · PHYSIONET 2012</div>
+  </div>
+  <div class="lab">SYNCURA</div>
+  <div class="pg">02 / 26</div>
+</div>
+
+<!-- 03 :: CHAPTER — INTRODUCTION -->
+<div id="chapter-intro" class="frame f-chapter" data-composition-id="chapter-intro" data-start="4" data-duration="2" data-label="Ch.01 Introduction" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:60%;height:24%;align-self:flex-start"></div>
+    <div class="step" style="width:100%;height:20%;align-self:flex-start"></div>
+    <div class="step" style="width:40%;height:22%;align-self:flex-start"></div>
+  </div>
+  <div class="body">
+    <div class="ix mono-tag">CHAPTER 01</div>
+    <h3 class="t-chapter serif">Introduction &amp;<br>Architecture.</h3>
+    <div class="lede">Why static, manually-calculated scores miss the trend — and what SynCura reads instead.</div>
+  </div>
+  <div class="pg">03 / 26</div>
+</div>
+
+<!-- 04 :: INTRO CONTEXT (ledger) -->
+<div id="intro-context" class="frame f-ledger" data-composition-id="intro-context" data-start="6" data-duration="2" data-label="Introduction" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Why Now</span><span class="mono-tag">LAB—01 / CONTEXT</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">10–29%</div><div class="dx">ICU mortality range — early detection of deterioration meaningfully changes outcomes.</div><span class="dl mono-tag">↑ risk</span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">NEWS2 / SOFA</div><div class="dx">Static thresholds, manual calculation, no temporal-trend capture, limited early sensitivity.</div><span class="dl mono-tag" style="opacity:.6">— reactive</span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">SynCura</div><div class="dx">Continuously-learning attention-LSTM reads the trend in vitals + labs, not just the latest reading.</div><span class="dl mono-tag">↑ 1–6h lead</span></div>
+    </div>
+  </div>
+  <div class="pg">04 / 26</div>
+</div>
+
+<!-- 05 :: ARCHITECTURE (diagram) -->
+<div id="architecture" class="frame f-diagram" data-composition-id="architecture" data-start="8" data-duration="2" data-label="System Architecture" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif">System Architecture</span><span class="mono-tag">FIG.01 / OVERVIEW</span></div>
+    <div class="dflow" style="height:15cqw">
+      <div class="dbox" style="flex:1"><div class="dt serif">Data Sources</div><div class="dd">PhysioNet 2012<br>set-a + Outcomes-a.txt<br>12 vitals &amp; labs</div></div>
+      <div class="darrow" style="flex:.35">→</div>
+      <div class="dbox" style="flex:1"><div class="dt serif">Backend API</div><div class="dd">FastAPI<br>/ingest /patients<br>/scores /explain</div></div>
+      <div class="darrow" style="flex:.35">→</div>
+      <div class="dbox" style="flex:1"><div class="dt serif">ML Pipeline</div><div class="dd">AttentionLSTM<br>12 feat · 90-min window<br>SHAP + attention</div></div>
+    </div>
+    <div class="dflow" style="height:10cqw;margin-top:2cqw;justify-content:flex-end;gap:2.2cqw;width:66cqw;margin-left:auto">
+      <div class="dbox" style="flex:1"><div class="dt serif">React Dashboard</div><div class="dd">risk board · waveforms<br>scenario sim · alerts</div></div>
+      <div class="dbox" style="flex:1"><div class="dt serif">Discord / Telegram</div><div class="dd">critical risk<br>escalation alerts</div></div>
+    </div>
+  </div>
+  <div class="pg">05 / 26</div>
+</div>
+
+<!-- 06 :: CHAPTER — LITERATURE REVIEW -->
+<div id="chapter-litreview" class="frame f-chapter" data-composition-id="chapter-litreview" data-start="10" data-duration="2" data-label="Ch.02 Literature Review" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:55%;height:22%;align-self:flex-start"></div>
+    <div class="step" style="width:95%;height:18%;align-self:flex-start"></div>
+    <div class="step" style="width:38%;height:20%;align-self:flex-start"></div>
+  </div>
+  <div class="body">
+    <div class="ix mono-tag">CHAPTER 02</div>
+    <h3 class="t-chapter serif">Literature<br>Review.</h3>
+    <div class="lede">One base paper, eight supporting works — model architecture, realistic targets, and honest ceilings.</div>
+  </div>
+  <div class="pg">06 / 26</div>
+</div>
+
+<!-- 07 :: LITREVIEW I (ledger) -->
+<div id="litreview-1" class="frame f-ledger" data-composition-id="litreview-1" data-start="12" data-duration="2" data-label="Literature Review I" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Base Paper &amp; Targets</span><span class="mono-tag">LAB—02 / N=05</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">Base</span><div class="nm serif">Wang, Bai &amp; Jin, 2026</div><div class="dx">LSTM/GRU/RNN on ventilated-ICU vitals, 3 outcomes, 25,751 patients.</div><span class="dl mono-tag">AUC .79–.87</span></div>
+      <div class="r"><span class="n mono-tag">S1</span><div class="nm serif">Yan et al., 2026</div><div class="dx">Five-architecture + stacking comparison, multi-center external validation.</div><span class="dl mono-tag">AUC .802</span></div>
+      <div class="r"><span class="n mono-tag">S2</span><div class="nm serif">Sadanandan, 2026</div><div class="dx">BiLSTM + ClinicalBERT cross-modal attention, MIMIC-IV, field-range benchmark.</div><span class="dl mono-tag">AUC .786</span></div>
+      <div class="r"><span class="n mono-tag">S3</span><div class="nm serif">Wu et al., 2024</div><div class="dx">LSTM on 4 core vitals — closest input-scope match, vitals-only upper bound.</div><span class="dl mono-tag">AUC .926</span></div>
+      <div class="r"><span class="n mono-tag">S4</span><div class="nm serif">Nguyen et al., 2017</div><div class="dx">Signal + temporal attention LSTM on PhysioNet 2012 — architectural lineage.</div><span class="dl mono-tag" style="opacity:.6">— origin</span></div>
+    </div>
+  </div>
+  <div class="pg">07 / 26</div>
+</div>
+
+<!-- 08 :: LITREVIEW II (ledger + positioning) -->
+<div id="litreview-2" class="frame f-ledger" data-composition-id="litreview-2" data-start="14" data-duration="2" data-label="Literature Review II" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Systems &amp; Contrast</span><span class="mono-tag">LAB—02 / N=04</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">S5</span><div class="nm serif">Xie et al. (RealMIP), 2025</div><div class="dx">Generative imputation, 188 eICU centers — honest ceiling for a single-dataset system.</div><span class="dl mono-tag">AUC .957–.968</span></div>
+      <div class="r"><span class="n mono-tag">S6</span><div class="nm serif">Mila &amp; Ray, 2025</div><div class="dx">IoT monitoring review — justifies ESP32 + centralized inference design.</div><span class="dl mono-tag" style="opacity:.6">— systems</span></div>
+      <div class="r"><span class="n mono-tag">S7</span><div class="nm serif">Mila et al. (MASC), 2025</div><div class="dx">Wearable HR/RR/Temp/SpO2 prototype — parallel to SynCura's ESP32/MAX30105.</div><span class="dl mono-tag" style="opacity:.6">— parallel</span></div>
+      <div class="r"><span class="n mono-tag">S8</span><div class="nm serif">Do et al., 2023</div><div class="dx">Graph attention over inter-variable relationships — contrast to temporal attention.</div><span class="dl mono-tag" style="opacity:.6">— contrast</span></div>
+    </div>
+    <div class="dnote"><b style="color:var(--ink)">Positioning —</b> a realistic, defensible target for a vitals+labs-only, single-dataset system is AUC 0.78–0.93; well below multi-database ceilings like RealMIP (0.96+).</div>
+  </div>
+  <div class="pg">08 / 26</div>
+</div>
+
+<!-- 09 :: PROBLEM STATEMENT (quote) -->
+<div id="problem-statement" class="frame f-quote" data-composition-id="problem-statement" data-start="16" data-duration="2" data-label="Problem Statement" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="kick">Problem Statement</div>
+    <div class="t-quote serif">Clinical scores react to a single reading. Deterioration is a trend — and by the time a threshold fires, it is already underway.</div>
+    <div class="rule"></div>
+    <div class="byline">GOAL — AN ATTENTION-LSTM THAT OUTPERFORMS NEWS2 ON SENSITIVITY AND LEAD TIME</div>
+  </div>
+  <div class="lab">SYNCURA</div>
+  <div class="pg">09 / 26</div>
+</div>
+
+<!-- 10 :: OBJECTIVES (ledger) -->
+<div id="objectives" class="frame f-ledger" data-composition-id="objectives" data-start="18" data-duration="2" data-label="Objectives" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Objectives</span><span class="mono-tag">LAB—03 / N=05</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">Model</div><div class="dx">Develop an Attention-LSTM for real-time deterioration risk from continuous vitals + labs.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Full stack</div><div class="dx">FastAPI backend for inference, React dashboard for clinical visualization.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Explainability</div><div class="dx">Per-timestep attention weights plus SHAP feature importance.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">Benchmark</div><div class="dx">Compare against the clinical NEWS2 baseline on sensitivity, specificity, lead time.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">05</span><div class="nm serif">Demonstration</div><div class="dx">Scenario simulation and real-time Discord/Telegram alerts for triage.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">10 / 26</div>
+</div>
+
+<!-- 11 :: CHAPTER — METHODOLOGY -->
+<div id="chapter-methodology" class="frame f-chapter" data-composition-id="chapter-methodology" data-start="20" data-duration="2" data-label="Ch.03 Methodology" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:50%;height:20%;align-self:flex-start"></div>
+    <div class="step" style="width:90%;height:24%;align-self:flex-start"></div>
+    <div class="step" style="width:36%;height:16%;align-self:flex-start"></div>
+  </div>
+  <div class="body">
+    <div class="ix mono-tag">CHAPTER 03</div>
+    <h3 class="t-chapter serif">Methodology.</h3>
+    <div class="lede">Dataset, model architecture, and the training strategy that took AUC 0.601 to 0.798.</div>
+  </div>
+  <div class="pg">11 / 26</div>
+</div>
+
+<!-- 12 :: DATASET & PREPROCESSING (ledger) -->
+<div id="dataset-preprocessing" class="frame f-ledger" data-composition-id="dataset-preprocessing" data-start="22" data-duration="2" data-label="Dataset &amp; Preprocessing" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Dataset &amp; Preprocessing</span><span class="mono-tag">LAB—04 / PHYSIONET 2012</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">Source</div><div class="dx">4,000 ICU patients (age ≥16), 37 time-series variables over 48h, binary mortality outcome.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Features</div><div class="dx">12 total — HR, RespRate, Temp, SysBP, DiasBP, SpO2, GCS, BUN, Creatinine, WBC, Platelets, Glucose.</div><span class="dl mono-tag">6→12</span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Window</div><div class="dx">90-minute sliding windows, 15-minute stride, proximity labeling over the last 12h of stay.</div><span class="dl mono-tag">60→90 min</span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">Split</div><div class="dx">Patient-level 80/20 via GroupShuffleSplit — prevents leakage across windows of one patient.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">12 / 26</div>
+</div>
+
+<!-- 13 :: MODEL ARCHITECTURE (diagram) -->
+<div id="model-architecture" class="frame f-diagram" data-composition-id="model-architecture" data-start="24" data-duration="2" data-label="Model Architecture" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif">AttentionLSTM</span><span class="mono-tag">FIG.02 / F12-H96-W90</span></div>
+    <div class="dflow" style="height:13cqw">
+      <div class="dbox" style="flex:1"><div class="dt serif">Input</div><div class="dd">(90, 12)</div></div>
+      <div class="darrow" style="flex:.28">→</div>
+      <div class="dbox" style="flex:1.2"><div class="dt serif">LSTM</div><div class="dd">hidden 96<br>layers 2 · dropout .3</div></div>
+      <div class="darrow" style="flex:.28">→</div>
+      <div class="dbox" style="flex:1.4"><div class="dt serif">Attention</div><div class="dd">Linear→Tanh→Linear<br>softmax over time</div></div>
+      <div class="darrow" style="flex:.28">→</div>
+      <div class="dbox" style="flex:1.2"><div class="dt serif">Context</div><div class="dd">weighted sum</div></div>
+      <div class="darrow" style="flex:.28">→</div>
+      <div class="dbox" style="flex:1.3"><div class="dt serif">Output</div><div class="dd">Dropout+BN<br>Linear→Sigmoid</div></div>
+    </div>
+    <div class="dnote">Additive (Bahdanau-style) attention over all 90 timesteps for per-moment interpretability. <b style="color:var(--ink)">pos_weight</b> in BCEWithLogitsLoss corrects for class imbalance (mortality is the minority class).</div>
+  </div>
+  <div class="pg">13 / 26</div>
+</div>
+
+<!-- 14 :: TRAINING STRATEGY (ledger) -->
+<div id="training-strategy" class="frame f-ledger" data-composition-id="training-strategy" data-start="26" data-duration="2" data-label="Training Strategy" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Training Strategy</span><span class="mono-tag">LAB—04 / 30+ CONFIGS</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">Optimizer</div><div class="dx">Adam, learning rate 3e-4.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Loss</div><div class="dx">Weighted BCEWithLogitsLoss, pos_weight ≈ 5.85–6.10.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Early stopping</div><div class="dx">Patience 7 epochs on validation AUC.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">Best config</div><div class="dx">f12-h96-w90 — 12 features, hidden 96, window 90, dropout 0.3. Found across 5 grid-search rounds.</div><span class="dl mono-tag">AUC 0.798</span></div>
+    </div>
+  </div>
+  <div class="pg">14 / 26</div>
+</div>
+
+<!-- 15 :: CHAPTER — IMPLEMENTATION -->
+<div id="chapter-implementation" class="frame f-chapter" data-composition-id="chapter-implementation" data-start="28" data-duration="2" data-label="Ch.04 Implementation" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:62%;height:18%;align-self:flex-start"></div>
+    <div class="step" style="width:96%;height:22%;align-self:flex-start"></div>
+    <div class="step" style="width:34%;height:18%;align-self:flex-start"></div>
+  </div>
+  <div class="body">
+    <div class="ix mono-tag">CHAPTER 04</div>
+    <h3 class="t-chapter serif">Implementation.</h3>
+    <div class="lede">FastAPI backend, React dashboard, and the dual explainability module.</div>
+  </div>
+  <div class="pg">15 / 26</div>
+</div>
+
+<!-- 16 :: BACKEND API (ledger) -->
+<div id="backend-api" class="frame f-ledger" data-composition-id="backend-api" data-start="30" data-duration="2" data-label="Backend — FastAPI" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Backend — FastAPI</span><span class="mono-tag">LAB—05 / ENDPOINTS</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">GET</span><div class="nm serif" style="font-size:1.5cqw">/patients</div><div class="dx">Top 6 patients ranked by current risk score.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">POST</span><div class="nm serif" style="font-size:1.5cqw">/ingest</div><div class="dx">Ingest a vital-sign reading, compute + return risk score, store to SQLite.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">GET</span><div class="nm serif" style="font-size:1.5cqw">/metrics</div><div class="dx">Latest trained model metrics — AUC, accuracy, recall.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">GET</span><div class="nm serif" style="font-size:1.5cqw">/patient/{id}/explain</div><div class="dx">SHAP feature importance + attention weights, per patient.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">POST</span><div class="nm serif" style="font-size:1.5cqw">/training/start</div><div class="dx">Launch a background training job with live NDJSON progress.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">16 / 26</div>
+</div>
+
+<!-- 17 :: FRONTEND DASHBOARD (ledger) -->
+<div id="frontend-dashboard" class="frame f-ledger" data-composition-id="frontend-dashboard" data-start="32" data-duration="2" data-label="Frontend — React Dashboard" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Frontend — Dashboard</span><span class="mono-tag">LAB—05 / REACT + VITE</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">Risk board</div><div class="dx">Ranked risk list, trend sparklines, status buckets: Stable / Watch / High / Critical.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Scenarios</div><div class="dx">5 presets — Baseline Mix, Respiratory Decline, Septic Shock, Cardiac Stress, Recovery.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Threshold tuning</div><div class="dx">Live risk-threshold slider with sensitivity / specificity / precision readouts.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">Training UI</div><div class="dx">Job configuration, live progress monitor, job history.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">17 / 26</div>
+</div>
+
+<!-- 18 :: EXPLAINABILITY (data) -->
+<div id="explainability" class="frame f-data" data-composition-id="explainability" data-start="34" data-duration="2" data-label="Explainability Module" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Explainability</span><span class="mono-tag">FIG.03 / SHAP IMPORTANCE</span></div>
+    <div class="chart">
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+    </div>
+    <div class="tk"><span>SpO2 .32</span><span>RespRate .28</span><span>SysBP .18</span><span>HR .12</span><span>DiasBP .06</span><span>Temp .04</span></div>
+    <div class="dnote">Attention answers <b style="color:var(--ink)">when</b> risk changed; SHAP (KernelSHAP) answers <b style="color:var(--ink)">which</b> vital or lab drove it — served via <span class="mono-sm">GET /patient/{id}/explain</span>.</div>
+  </div>
+  <div class="pg">18 / 26</div>
+</div>
+
+<!-- 19 :: CHAPTER — RESULTS -->
+<div id="chapter-results" class="frame f-chapter" data-composition-id="chapter-results" data-start="36" data-duration="2" data-label="Ch.05 Results" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:48%;height:22%;align-self:flex-start"></div>
+    <div class="step" style="width:88%;height:18%;align-self:flex-start"></div>
+    <div class="step" style="width:40%;height:24%;align-self:flex-start"></div>
+  </div>
+  <div class="body">
+    <div class="ix mono-tag">CHAPTER 05</div>
+    <h3 class="t-chapter serif">Results.</h3>
+    <div class="lede">AUC 0.798, a NEWS2 comparison, and an honest account of the gap.</div>
+  </div>
+  <div class="pg">19 / 26</div>
+</div>
+
+<!-- 20 :: RESULTS — AUC progression (data) -->
+<div id="results-auc" class="frame f-data" data-composition-id="results-auc" data-start="38" data-duration="2" data-label="Results — Model Performance" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">AUC-ROC Across Iterations</span><span class="mono-tag">FIG.04 / F12-H96-W90</span></div>
+    <div class="chart">
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div></div>
+    </div>
+    <div class="tk"><span>v1 · 6 feat — 0.601</span><span>v2 · pop-norm — 0.666</span><span>v3 · +SHAP fix — 0.752</span><span>v4 · 12 feat (current) — 0.798</span></div>
+  </div>
+  <div class="pg">20 / 26</div>
+</div>
+
+<!-- 21 :: RESULTS — NEWS2 comparison (data) -->
+<div id="results-news2" class="frame f-data" data-composition-id="results-news2" data-start="40" data-duration="2" data-label="Results — vs. NEWS2" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">SynCura vs. NEWS2</span><span class="mono-tag">FIG.05 / SENS + SPEC</span></div>
+    <div class="chart" style="max-width:60cqw">
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div><div class="c"></div></div>
+      <div class="st"><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c on"></div><div class="c"></div></div>
+    </div>
+    <div class="tk" style="max-width:60cqw"><span>NEWS2 sens — 53%</span><span>SynCura sens — 75%</span><span>NEWS2 spec — 80%</span><span>SynCura spec — 85%</span></div>
+    <div class="side">
+      <div class="micro">early-warning lead time</div>
+      <div class="t-numeral serif" style="font-size:6cqw;margin-top:.6cqw">1–6h</div>
+      <div class="t-body" style="text-align:right;margin-top:.6cqw">vs. reactive, post-hoc NEWS2 alerting.</div>
+    </div>
+  </div>
+  <div class="pg">21 / 26</div>
+</div>
+
+<!-- 22 :: KNOWN ISSUES (ledger) -->
+<div id="known-issues" class="frame f-ledger" data-composition-id="known-issues" data-start="42" data-duration="2" data-label="Known Issues &amp; Limitations" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Known Issues</span><span class="mono-tag">LAB—06 / HONEST LEDGER</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">!</span><div class="nm serif">Inference drift</div><div class="dx">backend/inference.py still hardcodes the old 6-feature, 60-min config against the new 12-feature model.</div><span class="dl mono-tag">fix pending</span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Client-side sim</div><div class="dx">Frontend scenario simulation does not read live scores back from the backend.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Hardcoded stats</div><div class="dx">Some WelcomePage figures may not reflect live /metrics values.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">No test suite</div><div class="dx">No automated unit tests for backend or ML pipeline yet.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">22 / 26</div>
+</div>
+
+<!-- 23 :: CONCLUSION (quote) -->
+<div id="conclusion" class="frame f-quote" data-composition-id="conclusion" data-start="44" data-duration="2" data-label="Conclusion" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="kick">Conclusion</div>
+    <div class="t-quote serif">A working, explainable, real-time ICU risk system — honestly scoped, and clear about where it still falls short of 0.87.</div>
+    <div class="rule"></div>
+    <div class="byline">AUC 0.601 → 0.798 · SENSITIVITY 53% → 75% · LEAD TIME 1–6H</div>
+  </div>
+  <div class="lab">SYNCURA</div>
+  <div class="pg">23 / 26</div>
+</div>
+
+<!-- 24 :: FUTURE SCOPE (ledger) -->
+<div id="future-scope" class="frame f-ledger" data-composition-id="future-scope" data-start="46" data-duration="2" data-label="Future Scope" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">Future Scope</span><span class="mono-tag">LAB—07 / N=05</span></div>
+    <div class="rows">
+      <div class="r"><span class="n mono-tag">01</span><div class="nm serif">Multi-database</div><div class="dx">MIMIC-III/IV, eICU training to close the gap toward 0.87–0.93.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">02</span><div class="nm serif">Multimodal fusion</div><div class="dx">Clinical notes via ClinicalBERT, per the base paper's own noted limitation.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">03</span><div class="nm serif">Config sync</div><div class="dx">Keep backend inference config in lockstep with the trained model, as standing practice.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">04</span><div class="nm serif">Live simulation</div><div class="dx">Wire the frontend to read live backend scores instead of client-side synthesis.</div><span class="dl"></span></div>
+      <div class="r"><span class="n mono-tag">05</span><div class="nm serif">Prospective trial</div><div class="dx">Federated, privacy-preserving training and real clinical validation.</div><span class="dl"></span></div>
+    </div>
+  </div>
+  <div class="pg">24 / 26</div>
+</div>
+
+<!-- 25 :: REFERENCES -->
+<div id="references" class="frame f-refs" data-composition-id="references" data-start="48" data-duration="2" data-label="References" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="body">
+    <div class="tb"><span class="t-hidx serif h">References</span><span class="mono-tag">LAB—08 / N=09</span></div>
+    <div class="rl"><span class="n">01</span><span class="t">Wang, Y., Bai, Y., &amp; Jin, G. (2026). Explainable Deep-Learning Models to Predict Diaphragmatic Dysfunction and Cognitive Stress in ICU Patients. <i>Frontiers in Physiology</i>, 17, 1765898. — Base Paper.</span></div>
+    <div class="rl"><span class="n">02</span><span class="t">Yan, Z. et al. (2026). Deep learning-based in-hospital mortality prediction using long-term sequential data. <i>PeerJ</i>, 14, e21631.</span></div>
+    <div class="rl"><span class="n">03</span><span class="t">Sadanandan, B. (2026). Multimodal Deep Learning for Early Prediction of Patient Deterioration in the ICU. arXiv:2603.14719.</span></div>
+    <div class="rl"><span class="n">04</span><span class="t">Wu, Y. et al. (2024). Revisiting the potential value of vital signs in real-time ICU mortality prediction. <i>Journal of Big Data</i>, 11, 40.</span></div>
+    <div class="rl"><span class="n">05</span><span class="t">Nguyen, et al. Deep Learning to Attend to Risk in ICU. arXiv:1707.05010.</span></div>
+    <div class="rl"><span class="n">06</span><span class="t">Xie, P. et al. (2025). Unlocking real-time ICU mortality prediction with continuous data recovery (RealMIP). <i>npj Digital Medicine</i>, 8, 733.</span></div>
+    <div class="rl"><span class="n">07</span><span class="t">Mila, S. A., &amp; Ray, S. (2025). IoT for Continuous Physiological Parameters Monitoring in Healthcare: A Review. <i>IEEE Sensors Journal</i>, 25(18).</span></div>
+    <div class="rl"><span class="n">08</span><span class="t">Mila, S. A. et al. (2025). MASC: Wearable Design for Infectious Disease Detection Through Machine Learning. <i>IEEE Access</i>, 13.</span></div>
+    <div class="rl"><span class="n">09</span><span class="t">PhysioNet / Computing in Cardiology Challenge 2012 — physionet.org/content/challenge-2012/</span></div>
+  </div>
+  <div class="pg">25 / 26</div>
+</div>
+
+<!-- 26 :: COLOPHON -->
+<div id="colophon" class="frame f-colo" data-composition-id="colophon" data-start="50" data-duration="2" data-label="Colophon" data-width="1920" data-height="1080">
+  <div class="ht"></div><div class="hb"></div>
+  <div class="glitch">
+    <div class="step" style="width:56%;height:20%;align-self:flex-end"></div>
+    <div class="step" style="width:98%;height:16%;align-self:flex-end"></div>
+    <div class="step" style="width:38%;height:18%;align-self:flex-end"></div>
+  </div>
+  <div class="body">
+    <div class="kick">P.A. College of Engineering · Dept. of CSE</div>
+    <h3 class="t-closing serif">Thank You.</h3>
+  </div>
+  <div class="credits">
+    <div class="c"><b>Team</b><div>Rafan Ahamad Sheik<br>Ullas K R<br>Vijeth<br>Yousuf Ihsan</div></div>
+    <div class="c"><b>Guidance</b><div>Prof. Habeeb UR Rehman<br>Assistant Professor, PACE</div></div>
+    <div class="c"><b>Project</b><div>SynCura — Predictive<br>ICU Monitoring System</div></div>
+  </div>
+  <div class="pg">26 / 26</div>
+</div>
+
+<script>
+window.__timelines = window.__timelines || {};
+const __coverTl = gsap.timeline({ paused: true });
+__coverTl.to({}, { duration: 2 });
+window.__timelines["cover"] = __coverTl;
+</script>
+</div>
+
+<div id="pager-nav">
+  <button id="pager-prev" type="button" aria-label="Previous slide">&#8592;</button>
+  <span id="pager-count">1 / 26</span>
+  <button id="pager-next" type="button" aria-label="Next slide">&#8594;</button>
+</div>
+<script>
+(function () {
+  var frames = Array.prototype.slice.call(document.querySelectorAll('.frame[data-composition-id]'));
+  var i = 0;
+  var countEl = document.getElementById('pager-count');
+  var prevBtn = document.getElementById('pager-prev');
+  var nextBtn = document.getElementById('pager-next');
+
+  function render() {
+    frames.forEach(function (f, idx) { f.classList.toggle('is-active', idx === i); });
+    countEl.textContent = (i + 1) + ' / ' + frames.length;
+    prevBtn.disabled = i === 0;
+    nextBtn.disabled = i === frames.length - 1;
+  }
+  function go(delta) {
+    i = Math.max(0, Math.min(frames.length - 1, i + delta));
+    render();
+  }
+
+  prevBtn.addEventListener('click', function () { go(-1); });
+  nextBtn.addEventListener('click', function () { go(1); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowRight' || e.key === ' ') { go(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'Backspace') { go(-1); }
+  });
+
+  render();
+})();
+</script>
+
+<script>
+(function () {
+  var stage = document.getElementById('stage');
+  function fit() {
+    var s = Math.min(window.innerWidth / 1920, window.innerHeight / 1080);
+    stage.style.transform = 'scale(' + s + ')';
+    stage.style.left = ((window.innerWidth - 1920 * s) / 2) + 'px';
+    stage.style.top = ((window.innerHeight - 1080 * s) / 2) + 'px';
+  }
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>
