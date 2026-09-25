@@ -52,7 +52,8 @@ def patient_level_auc(y, p, pids):
         return None, len(df)
     return float(roc_auc_score(labels, probs)), len(df)
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.paths import physionet2012_root as _pn_root
+BASE = _pn_root()
 ENS = {
     "s48": "ml/training_runs/exp_20260916_220047/seed48/model.pt",
     "c93": "ml/training_runs/exp_20260917_005359/seed93/model.pt",

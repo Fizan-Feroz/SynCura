@@ -25,7 +25,8 @@ import torch
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.paths import physionet2012_root as _pn_root
+BASE = _pn_root()
 FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
                'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
 GAP_SUFFIX = '_GAP'
@@ -342,12 +343,25 @@ def _run(args):
         _, v_idx = next(gss.split(np.zeros(len(val_pids)), np.zeros(len(val_pids)),
                                   groups=np.array(val_pids)))
         val_set = set(np.array(val_pids)[v_idx])
-        tr_mask_b = split_holdout(np.array(pb))
+        # Locked final-validation slice (ml/locked_holdout.json, v5 item #1):
+        # excluded from BOTH training and the reported working holdout, so the
+        # end-of-campaign locked evaluation is genuinely untouched.
+        locked_set = set()
+        lock_path = os.path.join('ml', 'locked_holdout.json')
+        if os.path.exists(lock_path):
+            try:
+                locked_set = set(json.load(open(lock_path))['patients'])
+                print(f'locked slice honored: {len(locked_set)} set-b patients excluded', flush=True)
+            except Exception as e:
+                print(f'WARNING: could not read locked slice ({e}); proceeding WITHOUT exclusion', flush=True)
+        pb_arr = np.array(pb)
+        tr_mask_b = split_holdout(pb_arr) & np.array([p not in locked_set for p in pb_arr])
+        ho_mask_b = ~split_holdout(pb_arr) & np.array([p not in locked_set for p in pb_arr])
         X_tr = np.concatenate([Xa[np.array([p not in val_set for p in pa])],
                                Xb[tr_mask_b]], axis=0)
         y_tr = np.concatenate([ya[np.array([p not in val_set for p in pa])],
                                yb[tr_mask_b]], axis=0)
-        X_fho, y_fho = Xb[~tr_mask_b], yb[~tr_mask_b]
+        X_fho, y_fho = Xb[ho_mask_b], yb[ho_mask_b]
         print(f'TRAIN combined: {X_tr.shape} dist={np.bincount(y_tr.astype(int))}', flush=True)
         print(f'VAL: {Xva.shape} | FRESH HOLDOUT: {X_fho.shape} '
               f'dist={np.bincount(y_fho.astype(int))}', flush=True)
