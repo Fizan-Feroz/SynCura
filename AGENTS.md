@@ -67,9 +67,13 @@ PROJ/
  │   ├── pick_ensemble.py         # Round 18: greedy holdout-gated ensemble selection (old 4-model: 0.837)
 │   ├── eval_combos.py           # Candidate-ensemble precision check
 │   ├── ensemble_swa.py          # SWA / logit-avg ensemble experiments
-│   ├── ensemble_best.json       # Deployed ensemble manifest (members, checkpoints, metrics)
+│   ├── campaign_auto.py         # Detached results campaign (E1->E2->ensemble->E4, stops at holdout >= 0.85)
+│   ├── scaler.json              # Population normalization stats (set-a train split)
+│   ├── scaler_combo8k.json      # Scaler for the set-a + 80% set-b member (c93)
+│   ├── deployed_manifest.json   # SERVED ensemble: members, checkpoints, features, AUC, threshold
+│   ├── ensemble_best.json       # Ensemble selection manifest (members, checkpoints, metrics)
 │   ├── requirements.txt         # numpy, pandas, scikit-learn, torch, shap, matplotlib
-│   ├── models/                  # Saved model weights (lstm_baseline.pt, GITIGNORED)
+│   ├── models/                  # Scratch weights GITIGNORED; ensemble/{s48,c93,s45}.pt TRACKED for deploy
 │   └── training_runs/           # Timestamped training run outputs (metrics.json only)
 │
 ├── backend/                     # FastAPI REST API
@@ -221,7 +225,9 @@ npx impeccable detect frontend/src
 - Model stats in frontend WelcomePage may still be hardcoded (check before modifying)
 - `chart.js` and `socket.io-client` are in package.json but unused
 - No unit tests exist yet
-- `ml/models/lstm_baseline.pt` is gitignored — commit model updates with `git add -f`
+- `ml/models/*.pt` is gitignored, so scratch checkpoints need `git add -f`. The deployed
+  ensemble `ml/models/ensemble/{s48,c93,s45}.pt` is tracked on purpose (Render boots from it,
+  no retraining) — update those files and `ml/deployed_manifest.json` together.
 - Full set-a (4000 patients) training is ~5-7 min/epoch at stride 15; use stride 30 (~2-3 min/epoch) for sweeps — deployment uses window 90 regardless of training stride
 - When comparing runs: the 0.807/0.833/0.837 numbers all use the ORIGINAL 1519-subset 80/20 stride-15
   val split (seed 42); full-set-a sweeps that use a different split are NOT directly comparable. Deployed val is 0.840 on that same split.

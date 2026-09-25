@@ -4,6 +4,9 @@ All datasets live under `PROJ/data/` (≈2.3 GB). That folder is **gitignored**:
 bytes travel via the team Google Drive (`scripts/download_data.py`), never via git.
 Paths resolve through `ml/paths.py` (`SYNCURA_DATA_ROOT` override, default `PROJ/data`).
 
+**Column-level schemas live in [`docs/DATASET_SCHEMAS.md`](docs/DATASET_SCHEMAS.md)**
+so they stay versioned with the code. This file is the inventory; that file is the schema.
+
 ## Directory map
 
 ```
@@ -28,11 +31,11 @@ data/
 - 8,000 ICU stays (set-a 4,000 train/val + set-b 4,000 holdout), 48 h each.
 - Format: one `.txt` per patient, long `Time,Parameter,Value` rows + `Outcomes-*.txt` (`In-hospital_death`).
 - Covers all 12 SynCura features (SpO2 read as SaO2).
-- Loader: `ml/dataset.py` (90-min windows, stride 15, proximity labels).
+- Loader: `ml/dataset.py` (90-min windows, stride 15, proximity labels). Proximity means only windows *starting* within the last `--horizon-hours` (default 12) of the stay are kept, each labeled with the patient's whole-stay `In-hospital_death` outcome. The 12 h is a window filter, not a prediction horizon. See `docs/DATASET_SCHEMAS.md`.
 
 ### 2. Challenge 2019 (sepsis) set A — scale-up data (real)
 - 20,336 ICU stays, hourly rows, pipe-delimited `.psv`, per-hour `SepsisLabel` (~9% positive).
-- Maps to 11/12 features (HR, O2Sat, Temp, SBP, DBP, Resp, BUN, Creatinine, Glucose, WBC, Platelets; **no GCS**).
+- Maps to 11/12 features (HR, O2Sat, Temp, SBP, DBP, Resp, BUN, Creatinine, Glucose, WBC, Platelets; **no GCS** — the 2019 schema has no GCS column).
 - Use: second training corpus / deterioration-label experiments. Needs its own loader (`challenge2019_to_features.py`, not yet written).
 
 ### 3. MIMIC-III demo (100 pts, 136 stays) + MIMIC-IV demo (100 pts, 140 stays) — ETL testbeds (real)

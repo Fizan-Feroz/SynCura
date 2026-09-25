@@ -38,13 +38,25 @@ build/
 .DS_Store
 Thumbs.db
 
+# Office lock files (Word/Excel owner files)
+~$*
+
+# Campaign / detached-run local state
+ml/training_runs/.campaign.lock
+ml/training_runs/*.log.err
+
 # ML Training artifacts
 ml/training_runs/**/*.pt
 ml/training_runs/**/*.log
 ml/training_runs/**/training.log
 ml/training_runs/**/stderr.log
 ml/training_runs/**/stdout.log
+# Model weights: scratch checkpoints are ignored, but the deployed ensemble
+# (ml/models/ensemble/{s48,c93,s45}.pt, ~0.5 MB each) is tracked on purpose so
+# Render can boot without retraining. Matched by ml/deployed_manifest.json.
 ml/models/*.pt
+ml/models/**/*.pt
+!ml/models/ensemble/*.pt
 
 # Runtime data (mutable; never commit live databases or job stores)
 backend/data/vitals.db
