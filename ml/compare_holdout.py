@@ -11,7 +11,8 @@ import numpy as np
 import torch
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.paths import physionet2012_root as _pn_root
+BASE = _pn_root()
 FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
                'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
 COMBO_RUN = 'ml/training_runs/exp_20260917_005359'
