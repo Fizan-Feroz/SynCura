@@ -14,10 +14,10 @@ export function ThemeSwitch({ theme, onToggleTheme }) {
   return (
     <div className="segmented theme-switch" role="group" aria-label="Display mode">
       <button type="button" aria-pressed={theme === 'light'} onClick={() => theme !== 'light' && onToggleTheme()}>
-        Paper
+        Light
       </button>
       <button type="button" aria-pressed={theme === 'dark'} onClick={() => theme !== 'dark' && onToggleTheme()}>
-        Monitor
+        Dark
       </button>
     </div>
   )
