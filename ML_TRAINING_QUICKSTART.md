@@ -113,11 +113,19 @@ curl -X POST http://localhost:8000/training/start \
     "batch_size": 32,
     "learning_rate": 0.001,
     "max_patients": 100,
-    "vital_features": ["HR", "RespRate", "Temp", "NISysABP", "NIDiasABP"]
+    "vital_features": ["HR", "RespRate", "Temp", "NISysABP", "NIDiasABP", "SpO2",
+                       "GCS", "BUN", "Creatinine", "WBC", "Platelets", "Glucose"],
+    "window": 90,
+    "hidden_size": 96
   }'
 ```
 
-Response includes `job_id` for monitoring.
+Response includes `job_id` (UUID-suffixed) for monitoring. Notes: only one
+job runs at a time (a second start returns 409); artifacts are job-scoped
+under `ml/models/<job_id>.*` and never overwrite serving files; metrics
+are scalars. Configs deviating from the 12-feature / window-90 /
+hidden-96 serving contract train in isolation and are flagged
+non-promotable.
 
 ### Get All Jobs
 

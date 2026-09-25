@@ -1,14 +1,16 @@
 {
-  "config": "ensemble-s48+c93+s45",
+  "config": "campaign-winner-E1-seed12+seed13 (CANDIDATE, not deployed)",
+  "serving": {
+    "config": "ensemble-s48+c93+s45 (pre-fix, leaky pipeline; contaminated holdout)",
+    "note": "Still loaded by backend/inference.py. Winner below NOT yet promoted; promotion needs review."
+  },
   "members": [
-    "s48",
-    "c93",
-    "s45"
+    "improve_baseline_E1/seed13",
+    "improve_baseline_E1/seed12"
   ],
   "checkpoints": [
-    "ml/models/ensemble/s48.pt",
-    "ml/models/ensemble/c93.pt",
-    "ml/models/ensemble/s45.pt"
+    "ml/training_runs/improve_baseline_E1/seed13/model.pt",
+    "ml/training_runs/improve_baseline_E1/seed12/model.pt"
   ],
   "features": [
     "HR",
@@ -27,16 +29,21 @@
   "window": 90,
   "hidden_size": 96,
   "val_split": "original-1519-subset-stride15-seed42",
-  "best_auc": 0.8401,
-  "val_auc": 0.8401,
-  "val_accuracy": 0.7384,
-  "val_recall": 0.816,
-  "val_precision": 0.3566,
+  "best_auc": 0.8349534021728315,
+  "val_auc": 0.8349534021728315,
+  "val_accuracy": 0.7358606978816755,
+  "val_recall": 0.78515625,
   "holdout_auc": null,
-  "holdout_note": "full set-b holdout N/A (c93 member trained on 80pct of set-b); see fresh_holdout_auc",
-  "fresh_holdout_auc": 0.8441,
-  "fresh_holdout_accuracy": 0.7471,
-  "fresh_holdout_recall": 0.8066,
-  "fresh_holdout_precision": 0.3446,
-  "fresh_holdout_note": "20pct of set-b (seed 123); unseen by weights but USED during ensemble selection, not a locked final test"
+  "holdout_note": "full set-b holdout N/A by design (locked slice carved out; working holdout below excludes locked patients)",
+  "fresh_holdout_auc": 0.8368651276076624,
+  "fresh_holdout_accuracy": 0.7508079409048938,
+  "fresh_holdout_recall": 0.8052959501557633,
+  "fresh_holdout_precision": null,
+  "fresh_holdout_note": "20pct set-b (seed 123) MINUS 94 locked patients; unseen by weights but USED in ensemble selection, not a locked test",
+  "locked_auc": 0.8275,
+  "locked_accuracy": 0.7698,
+  "locked_recall": 0.7734,
+  "locked_specificity": 0.7693,
+  "locked_precision": 0.3144,
+  "locked_note": "ONE-TIME eval on locked 400 set-b patients (seed 999), never trained/selected on. THE paper/report number. See ml/LOCKED_EVAL_20260926.json."
 }

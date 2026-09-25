@@ -309,10 +309,14 @@ def get_metrics():
     with open(metrics_path) as f:
         raw = json.load(f)
     mapped = dict(raw)
-    mapped["auc"] = raw.get("fresh_holdout_auc", raw.get("val_auc", raw.get("auc")))
-    mapped["accuracy"] = raw.get("fresh_holdout_accuracy", raw.get("val_accuracy", raw.get("accuracy")))
-    mapped["recall"] = raw.get("fresh_holdout_recall", raw.get("val_recall", raw.get("recall")))
-    mapped["precision"] = raw.get("fresh_holdout_precision", raw.get("val_precision", raw.get("precision")))
+    # Prefer the ONE-TIME locked evaluation when present (v5 Step 5: the UI
+    # reports the honest number, not the selection-influenced holdout).
+    mapped["auc"] = raw.get("locked_auc", raw.get("fresh_holdout_auc", raw.get("val_auc", raw.get("auc"))))
+    mapped["accuracy"] = raw.get("locked_accuracy", raw.get("fresh_holdout_accuracy", raw.get("val_accuracy", raw.get("accuracy"))))
+    mapped["recall"] = raw.get("locked_recall", raw.get("fresh_holdout_recall", raw.get("val_recall", raw.get("recall"))))
+    mapped["precision"] = raw.get("locked_precision", raw.get("fresh_holdout_precision", raw.get("val_precision", raw.get("precision"))))
+    mapped["auc_source"] = ("locked-once" if raw.get("locked_auc") is not None
+                            else "working-holdout" if raw.get("fresh_holdout_auc") is not None else "validation")
     return mapped
 
 
