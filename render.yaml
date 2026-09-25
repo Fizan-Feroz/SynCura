@@ -1,0 +1,19 @@
+# Render blueprint for the SynCura FastAPI backend.
+# Deploy via the Render dashboard: New > Blueprint > select this repo.
+# After deploy, set CORS_ORIGINS to the Vercel frontend URL and copy the
+# service URL into the Vercel project's VITE_API_URL variable.
+services:
+  - type: web
+    name: syncura-backend
+    runtime: python
+    plan: starter
+    healthCheckPath: /health
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: CORS_ORIGINS
+        value: https://syncura.vercel.app
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
