@@ -1,0 +1,23 @@
+{
+  "members": [
+    "improve_gap_E2a/seed23"
+  ],
+  "checkpoints": [
+    "ml/training_runs/improve_gap_E2a\\seed23\\model.pt"
+  ],
+  "scalers": [
+    "ml/training_runs/improve_gap_E2a\\seed23\\scaler.json"
+  ],
+  "model_classes": [
+    "attention"
+  ],
+  "val_auc": 0.833005224163704,
+  "val_accuracy": 0.736066360457942,
+  "val_recall": 0.79296875,
+  "fresh_holdout_auc": 0.8325725012229738,
+  "fresh_holdout_accuracy": 0.7431506849315068,
+  "fresh_holdout_recall": 0.8000886524822695,
+  "candidate_only": true,
+  "holdout_gate": 0.83,
+  "passes_gate": true
+}

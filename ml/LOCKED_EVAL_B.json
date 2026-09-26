@@ -1,0 +1,28 @@
+{
+  "candidate": "ml/training_runs/improve_baseline_E1b/candidate_ensemble.json",
+  "members": [
+    "improve_gap_E2a/seed23"
+  ],
+  "locked_seed": 777,
+  "locked_n_patients": 360,
+  "n_windows": 8640,
+  "auc": 0.8178052334435977,
+  "accuracy": 0.7328703703703704,
+  "sensitivity": 0.7773224043715847,
+  "specificity": 0.7238015607580826,
+  "precision": 0.3647435897435897,
+  "evaluated_utc": "2026-09-26T03:30:57.291172+00:00",
+  "note": "ONE-TIME evaluation. Do not re-run with other configs.",
+  "tp_patients_for_attention_check": [
+    "143200",
+    "143261",
+    "143403",
+    "143439",
+    "143635",
+    "143670",
+    "143696",
+    "143849",
+    "143861",
+    "144112"
+  ]
+}
