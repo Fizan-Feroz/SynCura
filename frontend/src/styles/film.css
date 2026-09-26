@@ -352,8 +352,9 @@
     font-size: clamp(2rem, 8.6vw, 2.8rem);
   }
 
+  /* Keep it on phones: it carries the research-prototype qualifier */
   .film-lede {
-    display: none;
+    font-size: var(--t-sm);
   }
 
   .final-word {
@@ -383,5 +384,27 @@
 
   .ring-vitals {
     gap: var(--space-4);
+  }
+}
+
+/* Short phones: tighten the copy so the lede fits above the horizon wordmark */
+@media (max-width: 820px) and (max-height: 760px) {
+  .film-copy {
+    top: 16px;
+    gap: var(--space-3);
+  }
+
+  .film-title {
+    font-size: clamp(1.6rem, 7vw, 2.1rem);
+  }
+
+  .film-lede {
+    font-size: var(--t-xs);
+    line-height: 1.45;
+  }
+
+  .film-actions .btn {
+    min-height: 38px;
+    padding-block: 0;
   }
 }
