@@ -144,15 +144,15 @@
     grid-column: 1 / -1;
     grid-row: 2;
     justify-self: stretch;
-    overflow-x: auto;
-    scrollbar-width: none;
-    margin: 0 calc(var(--gutter) * -1);
-    padding: 0 calc(var(--gutter) - var(--space-3));
+    /* Wrap instead of a hidden-scrollbar strip: off-screen links were unreachable-looking */
+    flex-wrap: wrap;
+    column-gap: 0;
+    margin: 0 calc(var(--space-3) * -1);
   }
 
   .topbar-link {
     white-space: nowrap;
-    padding-block: var(--space-3);
+    padding-block: var(--space-2);
   }
 }
 
@@ -180,6 +180,8 @@
 
 .page {
   display: grid;
+  /* minmax(0, …) so wide children scroll inside their own wrappers instead of stretching the page */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
 }
 

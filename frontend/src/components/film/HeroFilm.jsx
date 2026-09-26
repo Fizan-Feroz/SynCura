@@ -59,7 +59,7 @@ export default function HeroFilm() {
   }, [])
 
   useGSAP(
-    (context, contextSafe) => {
+    () => {
       const q = gsap.utils.selector(root)
       const world = { x: CX, y: FINAL_Y, s: 1 }
       const worldEl = q('.final-world')[0]
@@ -70,10 +70,13 @@ export default function HeroFilm() {
       const pen = q('.final-pen')[0]
       const ecgLen = ecgPath.getTotalLength()
 
-      const finish = contextSafe(() => {
+      // Not contextSafe: it creates no tweens, and wrapping it made the useGSAP
+      // context adopt itself when the film completed inside the matchMedia
+      // context, so revert() recursed forever on unmount (blank page).
+      const finish = () => {
         markSeen()
         setState('done')
-      })
+      }
 
       // Ambient: a write head rides the rim trace, like a monitor sweep.
       const startAmbient = () => {
@@ -222,6 +225,12 @@ export default function HeroFilm() {
         gsap.set(ecgPath, { strokeDashoffset: 0 })
         setState('done')
       })
+
+      return () => {
+        ambient.current?.kill()
+        ambient.current = null
+        mm.revert()
+      }
     },
     { scope: root }
   )

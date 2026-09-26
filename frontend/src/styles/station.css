@@ -1,5 +1,7 @@
 .station {
   display: grid;
+  /* An auto track sized to its widest child pushed the page past the viewport on phones */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-5);
 }
 
@@ -79,14 +81,15 @@
     max-width: 100%;
   }
 
+  /* Wrap the scenarios so every one stays visible (a hidden-scrollbar strip clipped them) */
   .station-controls .segmented {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
+    border-radius: var(--radius);
   }
 
   .station-controls .segmented button {
+    flex: 1 1 auto;
     white-space: nowrap;
+    border-radius: var(--radius);
   }
 
   .station-summary {
