@@ -37,6 +37,15 @@ def main():
     locked_set = set(locked['patients'])
     print(f"locked slice: seed={locked['seed']} n={locked['n_patients']}", flush=True)
 
+    need_gap = False
+    for scpath in cand['scalers']:
+        try:
+            if len(json.load(open(scpath)).get('features', [])) > 12:
+                need_gap = True
+        except Exception:
+            pass
+    if need_gap:
+        print('candidate needs 24-dim gap input; building gap windows', flush=True)
     from ml.dataset import load_physionet_batch, create_sequences_from_physionet
     data = load_physionet_batch(os.path.join(BASE, 'set-b_full', 'set-b'),
                                 os.path.join(BASE, 'Outcomes-b.txt'))
@@ -44,7 +53,7 @@ def main():
     print(f'locked patients loaded: {len(data)}', flush=True)
     X, y, pids = create_sequences_from_physionet(
         data, vital_features=FEATURES_12, window_minutes=90, stride=30,
-        label_mode='proximity', horizon_hours=12)
+        label_mode='proximity', horizon_hours=12, gap_channels=need_gap)
 
     from ml.train_lstm import AttentionLSTMModel, AttentionLSTMFusionModel
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
