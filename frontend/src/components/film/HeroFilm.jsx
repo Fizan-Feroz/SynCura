@@ -31,9 +31,17 @@ export default function HeroFilm() {
   const canvases = useRef([])
   const film = useRef(null)
   const ambient = useRef(null)
+  const mounted = useRef(true)
   const [state, setState] = useState('film') // film | done
   const [paused, setPaused] = useState(false)
   const rimPath = useMemo(() => toPath(rimEcg({ cx: 0, cy: 0, r: R - 4, amp: 58, beats: 12, span: 0.72, steps: 1400 })), [])
+
+  useLayoutEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   // The stage fills the viewport below the sticky top bar (taller on phones).
   useLayoutEffect(() => {
@@ -59,7 +67,7 @@ export default function HeroFilm() {
   }, [])
 
   useGSAP(
-    () => {
+    (context, contextSafe) => {
       const q = gsap.utils.selector(root)
       const world = { x: CX, y: FINAL_Y, s: 1 }
       const worldEl = q('.final-world')[0]
@@ -70,10 +78,11 @@ export default function HeroFilm() {
       const pen = q('.final-pen')[0]
       const ecgLen = ecgPath.getTotalLength()
 
-      // Not contextSafe: it creates no tweens, and wrapping it made the useGSAP
-      // context adopt itself when the film completed inside the matchMedia
-      // context, so revert() recursed forever on unmount (blank page).
+      // Plain callback on purpose: routing this through contextSafe lets a
+      // timeline completion during unmount re-enter the GSAP context and
+      // recurse until the stack overflows (blank page until refresh).
       const finish = () => {
+        if (!mounted.current) return
         markSeen()
         setState('done')
       }
@@ -182,6 +191,7 @@ export default function HeroFilm() {
             invalidateOnRefresh: true,
             onRefresh: placeRing,
             onUpdate: (self) => {
+              if (!mounted.current) return
               if (self.progress > 0.002 && tl.progress() < 1) tl.progress(1)
             },
           },
@@ -223,13 +233,14 @@ export default function HeroFilm() {
         gsap.set('.film-layer', { autoAlpha: 0 })
         gsap.set('.film-word', { autoAlpha: 0 })
         gsap.set(ecgPath, { strokeDashoffset: 0 })
-        setState('done')
+        if (mounted.current) setState('done')
       })
 
       return () => {
         ambient.current?.kill()
         ambient.current = null
-        mm.revert()
+        film.current?.kill()
+        film.current = null
       }
     },
     { scope: root }
