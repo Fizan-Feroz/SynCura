@@ -245,6 +245,20 @@ p {
   color: var(--paper);
 }
 
+/* ---------- Theme crossfade (0.25s) ---------- */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+
 /* ---------- Form fields ---------- */
 .field {
   display: grid;

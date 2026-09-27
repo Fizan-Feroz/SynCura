@@ -83,11 +83,46 @@
 
 .theme-switch {
   flex-wrap: nowrap;
+  position: relative;
 }
 
 .theme-switch button {
   min-height: 30px;
   padding: 0 var(--space-3);
+  position: relative;
+  z-index: 1;
+  background: transparent;
+  flex: 1 1 0;
+}
+
+.theme-switch button[aria-pressed='true'] {
+  background: transparent;
+  color: var(--paper);
+}
+
+.theme-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: var(--radius-pill);
+  background: var(--ink);
+  transition: transform 0.5s var(--ease), opacity 0.2s var(--ease);
+}
+
+.theme-switch[data-side='dark'] .theme-thumb {
+  transform: translateX(100%);
+}
+
+.theme-switch.is-moving .theme-thumb {
+  opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-thumb {
+    transition: none;
+  }
 }
 
 @media (max-width: 420px) {
@@ -144,15 +179,15 @@
     grid-column: 1 / -1;
     grid-row: 2;
     justify-self: stretch;
-    /* Wrap instead of a hidden-scrollbar strip: off-screen links were unreachable-looking */
-    flex-wrap: wrap;
-    column-gap: 0;
-    margin: 0 calc(var(--space-3) * -1);
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 calc(var(--gutter) * -1);
+    padding: 0 calc(var(--gutter) - var(--space-3));
   }
 
   .topbar-link {
     white-space: nowrap;
-    padding-block: var(--space-2);
+    padding-block: var(--space-3);
   }
 }
 
@@ -180,8 +215,6 @@
 
 .page {
   display: grid;
-  /* minmax(0, …) so wide children scroll inside their own wrappers instead of stretching the page */
-  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-6);
 }
 

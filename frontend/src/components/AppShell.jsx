@@ -11,12 +11,30 @@ const NAV = [
 ]
 
 export function ThemeSwitch({ theme, onToggleTheme }) {
+  const [side, setSide] = React.useState(theme)
+  const [moving, setMoving] = React.useState(false)
+  const timer = React.useRef(null)
+
+  React.useEffect(() => () => window.clearTimeout(timer.current), [])
+
+  const choose = (next) => {
+    if (next === side) return
+    setSide(next)
+    setMoving(true)
+    window.clearTimeout(timer.current)
+    timer.current = window.setTimeout(() => {
+      onToggleTheme()
+      setMoving(false)
+    }, 600)
+  }
+
   return (
-    <div className="segmented theme-switch" role="group" aria-label="Display mode">
-      <button type="button" aria-pressed={theme === 'light'} onClick={() => theme !== 'light' && onToggleTheme()}>
+    <div className={`segmented theme-switch${moving ? ' is-moving' : ''}`} role="group" aria-label="Display mode" data-side={side}>
+      <span className="theme-thumb" aria-hidden="true" />
+      <button type="button" aria-pressed={side === 'light'} onClick={() => choose('light')}>
         Light
       </button>
-      <button type="button" aria-pressed={theme === 'dark'} onClick={() => theme !== 'dark' && onToggleTheme()}>
+      <button type="button" aria-pressed={side === 'dark'} onClick={() => choose('dark')}>
         Dark
       </button>
     </div>

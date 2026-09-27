@@ -40,7 +40,11 @@ function Loading() {
 
 export default function App() {
   const [theme, setTheme] = useState(initialTheme)
-  const toggleTheme = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+  const toggleTheme = () => {
+    const apply = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))
+    if (document.startViewTransition) document.startViewTransition(apply)
+    else apply()
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme === 'dark' ? 'monitor' : 'paper'
