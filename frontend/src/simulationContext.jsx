@@ -167,6 +167,42 @@ function statusForRisk(risk) {
   return 'Stable'
 }
 
+function pickLatestNumber(rows, key) {
+  for (const row of rows) {
+    const value = Number(row?.[key])
+    if (Number.isFinite(value)) return value
+  }
+  return NaN
+}
+
+// Map a backend /patient/{id} payload (replayed PhysioNet rows, device
+// ingests, or anything else in the backend store) onto the bed shape the
+// views render. Missing vitals stay NaN so thresholds never misfire.
+function mapLivePatient(detail) {
+  const rows = Array.isArray(detail?.vitals) ? detail.vitals : []
+  const id = String(detail?.patient_id ?? 'unknown')
+  const scores = rows.map((row) => Number(row?.risk_score)).filter(Number.isFinite).reverse()
+  const waveform = (scores.length ? scores : [Number(detail?.risk) || 0]).slice(-12).map((v) => Math.round(v))
+  const risk = waveform.length ? waveform[waveform.length - 1] : 0
+  const delta = waveform.length > 1 ? waveform[waveform.length - 1] - waveform[0] : 0
+  return {
+    patient_id: id,
+    bed: `BED-${id.slice(-3)}`,
+    status: statusForRisk(risk),
+    risk,
+    trend: `${delta >= 0 ? '+' : ''}${delta}`,
+    lead: 'Backend ingest',
+    trajectory: 'replay',
+    waveform,
+    vitals: {
+      HR: pickLatestNumber(rows, 'hr'),
+      SpO2: pickLatestNumber(rows, 'spo2'),
+      Resp: pickLatestNumber(rows, 'rr'),
+      Temp: pickLatestNumber(rows, 'temp'),
+    },
+  }
+}
+
 function updatePatient(patient, scenarioProfile, scenarioLead) {
   const trajectory = patient.trajectory || 'stable'
   const traj = trajectoryProfile(trajectory)
@@ -227,7 +263,8 @@ export function SimulationProvider({ children }) {
   const [backendError, setBackendError] = useState(null)
   const [backendVersion, setBackendVersion] = useState(null)
   // Data source: 'simulated' runs the local engine, 'live' mirrors the shared
-  // backend scenario engine so every browser sees identical beds.
+  // backend scenario engine, 'replay' shows whatever the backend has actually
+  // ingested (PhysioNet replay, devices, or simulation posts).
   const [source, setSource] = useState('simulated')
   const [liveMeta, setLiveMeta] = useState({ scenario: 'baseline', scenarioLabel: 'Baseline Mix', tick: 0, paused: true })
   const [liveError, setLiveError] = useState(null)
@@ -406,6 +443,45 @@ export function SimulationProvider({ children }) {
     return () => window.clearInterval(intervalId)
   }, [source, backendStatus, reloadLive])
 
+  // Replay source: read back what the backend actually ingested. Works with
+  // PhysioNet replay (backend/replay.py), device posts, or simulation ingests.
+  const reloadReplay = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/patients`)
+      if (!res.ok) throw new Error(`GET /patients -> ${res.status}`)
+      const data = await res.json()
+      const list = Array.isArray(data.patients) ? data.patients.slice(0, 12) : []
+      const details = await Promise.all(
+        list.map(async (entry) => {
+          try {
+            const r = await fetch(`${API_URL}/patient/${encodeURIComponent(entry.patient_id)}`)
+            if (!r.ok) return null
+            return r.json()
+          } catch {
+            return null
+          }
+        })
+      )
+      const beds = details.filter(Boolean).map(mapLivePatient)
+      setPatientQueue(beds)
+      setLiveError(beds.length ? null : 'empty')
+      setLastUpdated(new Date())
+      return true
+    } catch (err) {
+      setLiveError(err?.message || 'Backend patients unreachable.')
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (source !== 'replay' || backendStatus !== 'online') return undefined
+    reloadReplay()
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'hidden') reloadReplay()
+    }, 5000)
+    return () => window.clearInterval(intervalId)
+  }, [source, backendStatus, reloadReplay])
+
   const controlLive = useCallback(async (action, scenario) => {
     try {
       const res = await fetch(`${API_URL}/simulation/control`, {
@@ -460,6 +536,7 @@ export function SimulationProvider({ children }) {
       liveError,
       liveMeta,
       reloadLive,
+      reloadReplay,
         setActiveScenario: (key) => {
           if (live) controlLive('set_scenario', key)
           else setActiveScenario(key)
@@ -480,7 +557,7 @@ export function SimulationProvider({ children }) {
         },
       }
     },
-    [activeScenario, backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, isPaused, reloadLive, retryBackend, source]
+    [activeScenario, backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, isPaused, reloadLive, reloadReplay, retryBackend, source]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>

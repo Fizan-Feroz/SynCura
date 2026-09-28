@@ -86,7 +86,7 @@ export default function SensorWaveform() {
                       <span className="channel-read">
                         <span className="channel-label">{CHANNELS[k].short}</span>
                         <span className="num channel-value">
-                          {k === 'Temp' ? patient.vitals[k].toFixed(1) : patient.vitals[k]}
+                          {Number.isFinite(patient.vitals[k]) ? (k === 'Temp' ? patient.vitals[k].toFixed(1) : patient.vitals[k]) : '—'}
                           <small>{CHANNELS[k].unit}</small>
                         </span>
                       </span>

@@ -13,6 +13,11 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
 }
 
+function fmtVital(value, digits = 0) {
+  if (!Number.isFinite(value)) return '—'
+  return digits ? value.toFixed(digits) : value
+}
+
 function hasDeteriorationEvent(p) {
   return p.vitals.SpO2 <= 90 || p.vitals.Resp >= 30 || p.vitals.Temp >= 39.2 || p.risk >= 88
 }
@@ -84,10 +89,10 @@ function BedTile({ patient, selected, onSelect, threshold }) {
         </span>
         <span className="bed-body">
           <span className="bed-readouts">
-            <Readout label="HR" value={patient.vitals.HR} color="var(--hr)" />
-            <Readout label="SpO2" value={patient.vitals.SpO2} color="var(--spo2)" />
-            <Readout label="RR" value={patient.vitals.Resp} color="var(--rr)" />
-            <Readout label="T" value={patient.vitals.Temp.toFixed(1)} color="var(--temp)" />
+            <Readout label="HR" value={fmtVital(patient.vitals.HR)} color="var(--hr)" />
+            <Readout label="SpO2" value={fmtVital(patient.vitals.SpO2)} color="var(--spo2)" />
+            <Readout label="RR" value={fmtVital(patient.vitals.Resp)} color="var(--rr)" />
+            <Readout label="T" value={fmtVital(patient.vitals.Temp, 1)} color="var(--temp)" />
           </span>
           <RiskRing value={patient.risk} />
         </span>
@@ -121,6 +126,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
     setDataSource,
     liveError,
     reloadLive,
+    reloadReplay,
   } = useSimulation()
   const navigate = useNavigate()
   const [threshold, setThreshold] = useState(75)
@@ -157,6 +163,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
   const byId = useMemo(() => new Map(patientQueue.map((p) => [p.patient_id, p])), [patientQueue])
   const ranked = order.map((id) => byId.get(id)).filter(Boolean)
   const live = source === 'live'
+  const replay = source === 'replay'
 
   // FLIP: record tile positions before React commits a new order...
   const gridRef = useRef(null)
@@ -228,22 +235,32 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <p className="muted small">
               {live
                 ? 'Shared backend simulation — every visitor sees these same beds, scored by the deployed model.'
-                : 'Synthetic patients. Scores on this screen are simulated in your browser; every reading is also sent to the backend model.'}
+                : replay
+                  ? 'Backend ingests — real retrospective stays and device posts, scored live by the deployed model. Not live patients.'
+                  : 'Synthetic patients. Scores on this screen are simulated in your browser; every reading is also sent to the backend model.'}
             </p>
           </div>
           <div className="station-controls">
             <div className="segmented" role="group" aria-label="Data source">
-              <button type="button" aria-pressed={!live} onClick={() => live && setDataSource('simulated')}>
+              <button type="button" aria-pressed={!live && !replay} onClick={() => (live || replay) && setDataSource('simulated')}>
                 Simulated
               </button>
               <button type="button" aria-pressed={live} onClick={() => !live && setDataSource('live')}>
                 Backend live
+              </button>
+              <button type="button" aria-pressed={replay} onClick={() => !replay && setDataSource('replay')}>
+                Replay
               </button>
             </div>
             {live ? (
               <span className="live-status station-live is-live" aria-live="polite">
                 <span className="live-dot" aria-hidden="true" />
                 Backend live · shared beds
+              </span>
+            ) : replay ? (
+              <span className="live-status station-live is-live" aria-live="polite">
+                <span className="live-dot" aria-hidden="true" />
+                Backend replay · retrospective
               </span>
             ) : (
               <>
@@ -278,6 +295,23 @@ export default function Dashboard({ theme, onToggleTheme }) {
             </p>
             <div className="page-actions">
               <button type="button" className="btn btn-primary btn-sm" onClick={reloadLive}>
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {replay && ranked.length === 0 && (
+          <div className="page">
+            <p className="notice notice-error" role="alert">
+              No ingested patients in the backend yet{liveError && liveError !== 'empty' ? `: ${liveError}` : ''}.
+            </p>
+            <p className="muted small">
+              Start a retrospective replay against this backend, then press Retry:
+            </p>
+            <p className="muted small"><code>python backend/replay.py --mode http --url {API_URL}/ingest --physionet &lt;set-a dir&gt; --outcomes &lt;Outcomes-a.txt&gt; --speed 60 --max-patients 6</code></p>
+            <div className="page-actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={reloadReplay}>
                 Retry
               </button>
             </div>
@@ -347,7 +381,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                       </li>
                     ))}
                   </ul>
-                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : 'Demo with simulated patients — not for clinical use.'}</p>
+                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : replay ? 'Backend-ingested retrospective data — demo, not for clinical use.' : 'Demo with simulated patients — not for clinical use.'}</p>
                 </>
               )}
             </section>
@@ -379,7 +413,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 <tr><th scope="row">NEWS2 at 7 or more</th><td className="num">{news2Perf.sensitivity}%</td><td className="num">{news2Perf.specificity}%</td></tr>
               </tbody>
             </table>
-            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : 'Computed on the simulated beds, so it shows the idea, not real performance.'}</p>
+            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : replay ? 'Computed on backend-ingested beds, so it shows the idea, not real performance.' : 'Computed on the simulated beds, so it shows the idea, not real performance.'}</p>
           </div>
 
           <div className="lower-block">

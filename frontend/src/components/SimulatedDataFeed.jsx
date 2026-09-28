@@ -15,6 +15,7 @@ export default function SimulatedDataFeed() {
     backendError,
     retryBackend,
   } = useSimulation()
+  const fmt = (v, digits = 0) => (Number.isFinite(v) ? (digits ? v.toFixed(digits) : v) : '—')
 
   if (!backendOnline) {
     return (
@@ -79,10 +80,10 @@ export default function SimulatedDataFeed() {
                   <td><span className={`status status-${tone}`}>{riskLabel(p.risk)}</span></td>
                   <td className="num r strong">{p.risk}%</td>
                   <td className="num r">{p.trend}</td>
-                  <td className="num r">{p.vitals.HR}</td>
-                  <td className="num r">{p.vitals.SpO2}</td>
-                  <td className="num r">{p.vitals.Resp}</td>
-                  <td className="num r">{p.vitals.Temp.toFixed(1)}</td>
+                  <td className="num r">{fmt(p.vitals.HR)}</td>
+                  <td className="num r">{fmt(p.vitals.SpO2)}</td>
+                  <td className="num r">{fmt(p.vitals.Resp)}</td>
+                  <td className="num r">{fmt(p.vitals.Temp, 1)}</td>
                   <td>{p.lead}</td>
                   <td className="num muted">{p.waveform.slice(-6).join('  ')}</td>
                 </tr>

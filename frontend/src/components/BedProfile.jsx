@@ -85,7 +85,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
           <p className="muted">
             <span className={`status status-${tone}`}>{riskLabel(bed.risk)}</span>
             {' · '}
-            {source === 'live' ? 'Shared backend simulation' : `Simulated · ${activeScenarioLabel}`} · {bed.lead}
+            {source === 'live' ? 'Shared backend simulation' : source === 'replay' ? 'Backend ingest · retrospective' : `Simulated · ${activeScenarioLabel}`} · {bed.lead}
           </p>
         </div>
         <div className="page-actions">
@@ -166,9 +166,9 @@ export default function BedProfile({ theme, onToggleTheme }) {
             <li key={m.name}>
               <span>{m.name}</span>
               <span className={`driver-bar ${m.points >= 0 ? 'up' : 'down'}`}>
-                <span style={{ '--w': Math.min(1, Math.abs(m.value) / 10) }} />
+                <span style={{ '--w': Number.isFinite(m.value) ? Math.min(1, Math.abs(m.value) / 10) : 0 }} />
               </span>
-              <span className="num">{m.points >= 0 ? '+' : ''}{m.points}</span>
+              <span className="num">{Number.isFinite(m.points) ? `${m.points >= 0 ? '+' : ''}${m.points}` : '—'}</span>
             </li>
           ))}
         </ul>
@@ -184,7 +184,9 @@ export default function BedProfile({ theme, onToggleTheme }) {
       <p className="muted small" style={{ marginTop: 'var(--space-5)' }}>
         {source === 'live'
           ? 'Shared backend simulation — demo, not for clinical use.'
-          : 'Demo with simulated patients — not for clinical use.'}
+          : source === 'replay'
+            ? 'Backend-ingested retrospective data — demo, not for clinical use.'
+            : 'Demo with simulated patients — not for clinical use.'}
       </p>
     </div>
   )
