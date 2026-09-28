@@ -3,28 +3,11 @@ import { Link } from 'react-router-dom'
 import { gsap, useGSAP, ScrollTrigger, MOTION_OK } from '../../motion/gsap'
 import { SCENES, W, H, CX, CY, R, paintScene, rimEcg } from './scenes'
 
-const SEEN_KEY = 'syncura-film-seen'
 const RISK = 64
 const FINAL_DROP = 110 // the final horizon sits a little lower than the film's
 const FINAL_Y = CY + FINAL_DROP
 const WORD_ARC = `M ${CX - (R + 16)} ${CY} A ${R + 16} ${R + 16} 0 0 1 ${CX + R + 16} ${CY}`
 const toPath = (pts) => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`).join(' ')
-
-function readSeen() {
-  try {
-    return sessionStorage.getItem(SEEN_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
-function markSeen() {
-  try {
-    sessionStorage.setItem(SEEN_KEY, '1')
-  } catch {
-    /* storage unavailable */
-  }
-}
 
 export default function HeroFilm() {
   const root = useRef(null)
@@ -83,7 +66,6 @@ export default function HeroFilm() {
       // recurse until the stack overflows (blank page until refresh).
       const finish = () => {
         if (!mounted.current) return
-        markSeen()
         setState('done')
       }
 
@@ -154,8 +136,7 @@ export default function HeroFilm() {
           .fromTo('.film-copy > *', { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: 'power3.out' }, t + 1.5)
 
         film.current = tl
-        if (readSeen()) tl.progress(1)
-        else tl.play(0)
+        tl.play(0)
 
         // ---------------- scroll: horizon -> risk ring ----------------
         const ringTarget = () => {
