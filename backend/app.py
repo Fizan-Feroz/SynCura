@@ -5,6 +5,8 @@ from pydantic import BaseModel
 import json
 import logging
 import os
+import platform
+import sys
 import threading
 import queue
 import requests
@@ -56,6 +58,10 @@ app.add_middleware(
 
 inference_engine = get_engine()
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+START_TIME = time.time()
+INGEST_COUNT = 0
+LAST_INGEST_TIME = None
+_INGEST_LOCK = threading.Lock()
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "120"))
 # Minimum risk required to send risk-based Discord alerts (0-100)
 MIN_DISCORD_RISK = int(os.getenv("MIN_DISCORD_RISK", "90"))
@@ -88,6 +94,24 @@ def deployed_model_info():
         "model_id": manifest.get("model_id", "unknown"),
         "val_auc": manifest.get("val_auc"),
     }
+
+
+def uptime_seconds():
+    return time.time() - START_TIME
+
+
+def uptime_human(seconds=None):
+    total = int(seconds if seconds is not None else uptime_seconds())
+    days, rem = divmod(total, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, secs = divmod(rem, 60)
+    if days:
+        return f"{days}d {hours}h {minutes}m"
+    if hours:
+        return f"{hours}h {minutes}m {secs}s"
+    if minutes:
+        return f"{minutes}m {secs}s"
+    return f"{secs}s"
 
 
 def send_discord_alert(message: str):
@@ -233,6 +257,9 @@ def health():
         "ensemble_members": len(inference_engine.models),
         "degraded": inference_engine.degraded,
         "load_error": inference_engine.load_error,
+        "uptime_seconds": round(uptime_seconds(), 1),
+        "uptime_human": uptime_human(),
+        "server_time": time.time(),
     }
 
 
@@ -246,6 +273,55 @@ def version():
         "model_id": model["model_id"],
         "model_val_auc": model["val_auc"],
         "git_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+        "render_service": os.getenv("RENDER_SERVICE_NAME", "unknown"),
+        "render_external_url": os.getenv("RENDER_EXTERNAL_URL", ""),
+        "python_version": platform.python_version(),
+        "uptime_seconds": round(uptime_seconds(), 1),
+        "uptime_human": uptime_human(),
+    }
+
+
+@app.get("/admin/status")
+def admin_status():
+    """Machine-readable service status for the /admin panel.
+
+    Aggregates uptime, hosting (Render), model, and runtime counters so the
+    frontend can render uptime/downtime, latency, Vercel hosting, and Render
+    detail from live probes without inventing numbers.
+    """
+    model_loaded = inference_engine.model is not None or bool(inference_engine.models)
+    model = deployed_model_info()
+    with _INGEST_LOCK:
+        ingest_count = INGEST_COUNT
+        last_ingest = LAST_INGEST_TIME
+    return {
+        "status": "ok" if model_loaded else "degraded",
+        "model_loaded": model_loaded,
+        "uptime_seconds": round(uptime_seconds(), 1),
+        "uptime_human": uptime_human(),
+        "server_time": time.time(),
+        "started_at": START_TIME,
+        "backend": {
+            "service": "syncura-backend",
+            "website_version": website_version(),
+            "git_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
+            "render_service": os.getenv("RENDER_SERVICE_NAME", "unknown"),
+            "render_external_url": os.getenv("RENDER_EXTERNAL_URL", ""),
+            "python_version": platform.python_version(),
+            "platform": platform.platform(),
+            "cors_origins": CORS_ORIGINS,
+        },
+        "model": {
+            "model_id": model["model_id"],
+            "model_val_auc": model["val_auc"],
+            "ensemble_members": len(inference_engine.models),
+            "degraded": inference_engine.degraded,
+            "load_error": inference_engine.load_error,
+        },
+        "runtime": {
+            "ingest_count": ingest_count,
+            "last_ingest_time": last_ingest,
+        },
     }
 
 
@@ -266,6 +342,10 @@ def ingest_vital(vital: VitalRecord):
 
     # Store to database
     insert_vital(vital_dict)
+    global INGEST_COUNT, LAST_INGEST_TIME
+    with _INGEST_LOCK:
+        INGEST_COUNT += 1
+        LAST_INGEST_TIME = time.time()
     _dispatch_discord_live_alerts(vital_dict, risk_score)
 
     return {"patient_id": vital_dict['patient_id'], "risk_score": risk_score, "stored": True}

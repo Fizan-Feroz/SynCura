@@ -12,6 +12,7 @@ const TrainingJobsList = lazy(() => import('./components/TrainingJobsList'))
 const SimulatedDataFeed = lazy(() => import('./components/SimulatedDataFeed'))
 const ArchitecturePage = lazy(() => import('./components/ArchitecturePage'))
 const SensorWaveform = lazy(() => import('./components/SensorWaveform'))
+const AdminPanel = lazy(() => import('./components/AdminPanel'))
 
 function initialTheme() {
   try {
@@ -84,6 +85,7 @@ export default function App() {
               </>
             )}
             <Route path="/architecture" element={shell(<ArchitecturePage />)} />
+            <Route path="/admin" element={shell(<AdminPanel />, { wide: true })} />
           </Routes>
         </Suspense>
       </BrowserRouter>
