@@ -14,6 +14,6 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: CORS_ORIGINS
-        value: https://syncura.vercel.app
+        value: https://syncura-web.vercel.app
       - key: DISCORD_WEBHOOK_URL
         sync: false
