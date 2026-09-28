@@ -37,18 +37,16 @@ scrollbars follow.
 `App.jsx:45-52` writes the `data-theme` attribute and persists on every change.
 
 **The switch** (`ThemeSwitch` in `AppShell.jsx`) is a `role="group"` segmented
-control with `aria-pressed` per button. It is animated in two layers:
-- a sliding thumb, positioned from `data-side` and an `is-moving` class
+control with `aria-pressed` per button. It is animated in two synchronized layers:
+- a sliding thumb, positioned directly from the live `theme` value through `data-side`
 - a `document.startViewTransition` crossfade in `App.jsx`'s `toggleTheme`, which
   falls back to a plain state update when the API is unavailable
 
-Clicking a side sets an `is-moving` state immediately, then commits the actual
-theme switch after a 600 ms debounce, so the thumb animates first and the
-repaint lands once. The crossfade itself is `0.2s`
-(`styles/base.css:248-252`, `::view-transition-old/new(root)`), and
-`base.css:254-259` disables it under `prefers-reduced-motion: reduce`. Keep the
-JS debounce and the CSS duration in step — note the comment above that rule still
-says 0.25s while the value is 0.2s.
+Clicking a side changes the theme immediately. The thumb slide, body color
+transition, and root crossfade all use `--theme-dur` (`200ms`), with an
+`is-moving` class retained for the same beat as pressed feedback.
+`base.css` disables the crossfade under `prefers-reduced-motion: reduce`, and the
+thumb keeps full opacity in that mode.
 
 ---
 
@@ -157,8 +155,10 @@ exception is `--radius-pill` (999px), restricted to segmented controls.
 --ease: cubic-bezier(0.22, 1, 0.36, 1);
 --fast: 140ms;
 --normal-dur: 260ms;
+--theme-dur: 200ms;
 ```
-`body` transitions only `background-color` and `color` across the mode switch.
+`body` transitions only `background-color` and `color` across the mode switch,
+using the same `--theme-dur` as the thumb and root crossfade.
 There is no `transition: all` anywhere.
 
 **Layout:** `--content: 1240px`, `--gutter: clamp(16px, 4vw, 48px)`.

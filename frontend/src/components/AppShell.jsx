@@ -13,30 +13,29 @@ const NAV = [
 ].filter((item) => TRAINING_ENABLED || !item.internal)
 
 export function ThemeSwitch({ theme, onToggleTheme }) {
-  const [side, setSide] = React.useState(theme)
   const [moving, setMoving] = React.useState(false)
   const timer = React.useRef(null)
 
   React.useEffect(() => () => window.clearTimeout(timer.current), [])
 
   const choose = (next) => {
-    if (next === side) return
-    setSide(next)
+    if (next === theme || moving) return
     setMoving(true)
+    onToggleTheme()
     window.clearTimeout(timer.current)
+    // Keep the pressed/thumb feedback visible for the same beat as the theme crossfade.
     timer.current = window.setTimeout(() => {
-      onToggleTheme()
       setMoving(false)
-    }, 600)
+    }, 240)
   }
 
   return (
-    <div className={`segmented theme-switch${moving ? ' is-moving' : ''}`} role="group" aria-label="Display mode" data-side={side}>
+    <div className={`segmented theme-switch${moving ? ' is-moving' : ''}`} role="group" aria-label="Display mode" data-side={theme}>
       <span className="theme-thumb" aria-hidden="true" />
-      <button type="button" aria-pressed={side === 'light'} onClick={() => choose('light')}>
+      <button type="button" aria-pressed={theme === 'light'} onClick={() => choose('light')}>
         Light
       </button>
-      <button type="button" aria-pressed={side === 'dark'} onClick={() => choose('dark')}>
+      <button type="button" aria-pressed={theme === 'dark'} onClick={() => choose('dark')}>
         Dark
       </button>
     </div>

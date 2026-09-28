@@ -115,7 +115,7 @@
   width: calc(50% - 3px);
   border-radius: var(--radius-pill);
   background: var(--ink);
-  transition: transform 0.5s var(--ease), opacity 0.2s var(--ease);
+  transition: transform var(--theme-dur) var(--ease), opacity var(--theme-dur) var(--ease);
 }
 
 .theme-switch[data-side='dark'] .theme-thumb {
@@ -129,6 +129,9 @@
 @media (prefers-reduced-motion: reduce) {
   .theme-thumb {
     transition: none;
+  }
+  .theme-switch.is-moving .theme-thumb {
+    opacity: 1;
   }
 }
 

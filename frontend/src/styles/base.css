@@ -23,7 +23,7 @@ body {
   line-height: 1.55;
   font-stretch: var(--normal);
   -webkit-font-smoothing: antialiased;
-  transition: background-color var(--normal-dur) var(--ease), color var(--normal-dur) var(--ease);
+  transition: background-color var(--theme-dur) var(--ease), color var(--theme-dur) var(--ease);
 }
 
 img,
@@ -245,10 +245,10 @@ p {
   color: var(--paper);
 }
 
-/* ---------- Theme crossfade (0.25s) ---------- */
+/* ---------- Theme crossfade (matches --theme-dur) ---------- */
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.2s;
+  animation-duration: var(--theme-dur);
 }
 
 @media (prefers-reduced-motion: reduce) {

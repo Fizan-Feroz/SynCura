@@ -37,6 +37,7 @@
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --fast: 140ms;
   --normal-dur: 260ms;
+  --theme-dur: 200ms;
 
   --content: 1240px;
   --gutter: clamp(16px, 4vw, 48px);
