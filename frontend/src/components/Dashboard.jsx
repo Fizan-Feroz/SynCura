@@ -21,37 +21,33 @@ function scoreContributions(vitals) {
   ].map((m) => ({ ...m, points: Number((m.value * 0.05).toFixed(2)) }))
 }
 
-function alertTrendText(patient) {
-  if (!Array.isArray(patient.waveform) || patient.waveform.length < 2) return null
-  const delta = patient.waveform[patient.waveform.length - 1] - patient.waveform[patient.waveform.length - 2]
-  return `${delta >= 0 ? '+' : ''}${delta} pts since last tick`
+const PLAIN_DRIVER_NAMES = {
+  'Heart rate': 'heart rate',
+  'SpO2': 'oxygen',
+  'Respiratory rate': 'breathing',
+  'Temperature': 'temperature',
 }
 
-function topSimulatedDrivers(vitals, count = 2) {
+function topPlainDrivers(vitals, count = 2) {
   return scoreContributions(vitals)
     .slice()
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, count)
-    .map((m) => m.name.toLowerCase())
-}
-
-function simulationCause(patient) {
-  return `Simulated ${patient.trajectory || 'stable'} trajectory. In live monitoring, first exclude probe motion, poor signal quality, wrong sensor site, or a missed repeat reading. These are signal explanations, not diagnoses.`
+    .map((m) => PLAIN_DRIVER_NAMES[m.name] || m.name.toLowerCase())
 }
 
 function buildAlerts(patients) {
   const alerts = []
   patients.forEach((p) => {
-    const trend = alertTrendText(p)
     if (p.risk >= 90) {
       alerts.push({
         key: `${p.patient_id}-risk`,
         level: 'critical',
         bed: p.bed,
-        title: 'High model risk',
-        signal: `Risk ${p.risk}% crossed the 90% limit${trend ? `; ${trend}` : ''}. Largest simulated contributors: ${topSimulatedDrivers(p.vitals).join(', ')}.`,
-        cause: simulationCause(p),
-        action: 'Review at the bedside now under local protocol. This demo is not clinical evidence.',
+        title: 'Very high risk',
+        signal: `Risk ${p.risk}% (alerts at 90%). Main drivers: ${topPlainDrivers(p.vitals).join(', ')}.`,
+        cause: 'The concerning vitals behind this score are shown above. Sensors can also misread — confirm the probe and repeat key readings before acting on numbers alone.',
+        action: 'See the patient now and follow your unit\u2019s escalation protocol.',
       })
       return
     }
@@ -59,28 +55,28 @@ function buildAlerts(patients) {
       key: `${p.patient_id}-spo2`,
       level: 'warning',
       bed: p.bed,
-      title: 'Low SpO2',
-      signal: `SpO2 ${p.vitals.SpO2}% is at or below the 88% alarm limit${trend ? `; risk ${trend}` : ''}.`,
-      cause: simulationCause(p),
-      action: 'Confirm probe placement and repeat the reading, check the data feed/backend, then escalate under local protocol.',
+      title: 'Low oxygen',
+      signal: `Oxygen (SpO2) ${p.vitals.SpO2}% — alert level is 88% or below.`,
+      cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
+      action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
     })
     if (p.vitals.Resp >= 30) alerts.push({
       key: `${p.patient_id}-rr`,
       level: 'warning',
       bed: p.bed,
-      title: 'High respiratory rate',
-      signal: `Respiratory rate ${p.vitals.Resp}/min is at or above the 30/min alarm limit${trend ? `; risk ${trend}` : ''}.`,
-      cause: simulationCause(p),
-      action: 'Confirm the count/technique with a repeat measurement, check the data feed/backend, then escalate under local protocol.',
+      title: 'Fast breathing',
+      signal: `Breathing ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
+      cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
+      action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
     })
     if (p.vitals.Temp >= 39) alerts.push({
       key: `${p.patient_id}-temp`,
       level: 'info',
       bed: p.bed,
-      title: 'Fever-range temperature',
-      signal: `Temperature ${p.vitals.Temp.toFixed(1)} °C is at or above the 39.0 °C alarm limit${trend ? `; risk ${trend}` : ''}.`,
-      cause: simulationCause(p),
-      action: 'Confirm thermometer, site, and technique with a repeat measurement, check the data feed/backend, then escalate under local protocol.',
+      title: 'Fever',
+      signal: `Temperature ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
+      cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
+      action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
     })
   })
   return alerts.slice(0, 6)
@@ -395,13 +391,13 @@ export default function Dashboard({ theme, onToggleTheme }) {
                         <span className="alert-body">
                           <strong className="alert-title">{a.title}</strong>
                           <span>{a.signal}</span>
-                          <span className="alert-cause"><strong>Likely signal cause:</strong> {a.cause}</span>
-                          <span className="alert-action"><strong>Next step:</strong> {a.action}</span>
+                          <span className="alert-cause"><strong>Why:</strong> {a.cause}</span>
+                          <span className="alert-action"><strong>Do:</strong> {a.action}</span>
                         </span>
                       </li>
                     ))}
                   </ul>
-                  <p className="muted small">Simulated monitoring demo. Signal causes are measurement explanations, not diagnoses.</p>
+                  <p className="muted small">Demo with simulated patients — not for clinical use.</p>
                 </>
               )}
             </section>
