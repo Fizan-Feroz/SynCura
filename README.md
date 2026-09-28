@@ -20,6 +20,13 @@
 - Repeated gating on the same validation split makes validation AUC optimistic — keep the holdout gate on every deploy decision.
 - `ml/dataset.py` uses causal per-window interpolation (no future leakage). Checkpoints trained before that fix must be retrained for comparable numbers.
 
+## Release
+
+- Website: **v0.0.2**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
+- Deployed model: `syncura-attention-lstm-ensemble-v1`, per `ml/deployed_manifest.json`.
+- Deployment check: `GET /version` reports the backend’s website version, model, and git commit.
+- Training UI is internal-only: public builds hide it unless built with `VITE_ENABLE_TRAINING=true`.
+
 ## Architecture
 
 ```
@@ -171,6 +178,7 @@ Open `http://localhost:5173/`. Or start backend + frontend together from the rep
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | API status |
+| GET | `/version` | Website version, deployed model, and git commit |
 | POST | `/ingest` | Ingest vital JSON, returns risk score |
 | GET | `/patients` | Top 6 patients by risk score |
 | GET | `/patient/{patient_id}` | Patient details + recent vitals |
@@ -221,7 +229,7 @@ P.A. College of Engineering — Department of Computer Science & Engineering:
 ## Limitations (prototype disclaimer)
 
 - Research prototype: retrospective US ICU data (2012), no prospective trial, no fairness/subgroup analysis, no calibration report.
-- Frontend simulation is client-side and does not read back from the backend.
+- Frontend simulation is client-side and does not read back from the backend. Dynamic simulation views require a reachable backend and show a backend-unavailable error otherwise.
 - Explanations (attention/SHAP) describe model behaviour, not proven physiology.
 - Not a medical device. Do not use for clinical decisions.
 
