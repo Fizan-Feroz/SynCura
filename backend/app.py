@@ -460,6 +460,30 @@ def simulation_control(cmd: SimControl):
         raise HTTPException(status_code=400, detail=str(exc))
 
 
+@app.post("/replay/sample")
+def replay_sample():
+    """One-click replay seed: snapshot the shared engine's current beds into
+    the ingest store so the Replay view has something to show without any
+    local setup. Honestly labeled — these are engine beds, not retrospective
+    patient rows. Real PhysioNet replay still goes through backend/replay.py."""
+    snap = sim_engine.snapshot()
+    now = time.time()
+    stored = 0
+    for bed in snap.get("beds", []):
+        vitals = bed.get("vitals", {})
+        insert_vital({
+            "patient_id": bed.get("patient_id"),
+            "timestamp": now,
+            "HR": vitals.get("HR"),
+            "SpO2": vitals.get("SpO2"),
+            "RespRate": vitals.get("Resp"),
+            "Temp": vitals.get("Temp"),
+            "risk_score": bed.get("risk", 0),
+        })
+        stored += 1
+    return {"stored": stored, "source": "simulation-engine-snapshot"}
+
+
 @app.get("/metrics")
 def get_metrics():
     """Return deployed-model metrics with a stable schema for the dashboard.

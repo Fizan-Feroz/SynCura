@@ -172,6 +172,7 @@ Patient Vitals --> [Backend /ingest] --> [SQLite DB]
 | GET | `/admin/status` | Uptime, hosting, model, and ingest throughput for the admin panel |
 | GET | `/simulation/state` | Shared scenario beds — identical for every browser |
 | POST | `/simulation/control` | Shared sim control: start, pause, reset, set_scenario (open to all visitors) |
+| POST | `/replay/sample` | One-click seed: snapshot engine beds into the ingest store |
 | POST | `/ingest` | Ingest vital JSON, returns risk score |
 | GET | `/patients` | Top 6 patients by risk score |
 | GET | `/patient/{id}` | Patient details + recent vitals |

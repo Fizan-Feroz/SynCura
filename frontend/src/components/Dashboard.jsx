@@ -321,14 +321,32 @@ export default function Dashboard({ theme, onToggleTheme }) {
               No ingested patients in the backend yet{liveError && liveError !== 'empty' ? `: ${liveError}` : ''}.
             </p>
             <p className="muted small">
-              Start a retrospective replay against this backend, then press Retry:
+              No local setup needed — load a sample snapshot of the shared engine beds:
             </p>
-            <p className="muted small"><code>python backend/replay.py --mode http --url {API_URL}/ingest --physionet &lt;set-a dir&gt; --outcomes &lt;Outcomes-a.txt&gt; --speed 60 --max-patients 6</code></p>
             <div className="page-actions">
-              <button type="button" className="btn btn-primary btn-sm" onClick={reloadReplay}>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`${API_URL}/replay/sample`, { method: 'POST' })
+                    if (!res.ok) throw new Error(`POST /replay/sample -> ${res.status}`)
+                  } catch {
+                    /* reload surfaces the error */
+                  }
+                  reloadReplay()
+                }}
+              >
+                Load sample beds
+              </button>
+              <button type="button" className="btn btn-quiet btn-sm" onClick={reloadReplay}>
                 Retry
               </button>
             </div>
+            <p className="muted small">
+              For real retrospective rows instead, run a PhysioNet replay against this backend:
+            </p>
+            <p className="muted small"><code>python backend/replay.py --mode http --url {API_URL}/ingest --physionet &lt;set-a dir&gt; --outcomes &lt;Outcomes-a.txt&gt; --speed 60 --max-patients 6</code></p>
           </div>
         )}
 

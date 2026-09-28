@@ -129,6 +129,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 | GET | `/admin/status` | uptime, hosting, model, ingest throughput (admin panel) |
 | GET | `/simulation/state` | shared scenario beds, identical for every browser |
 | POST | `/simulation/control` | shared sim control, open to all visitors |
+| POST | `/replay/sample` | one-click seed of engine beds into the ingest store |
 | POST | `/ingest` | vital JSON in, `{patient_id, risk_score, stored}` out |
 | GET | `/patients` | top 6 by risk |
 | GET | `/patient/{id}` | details + recent vitals |

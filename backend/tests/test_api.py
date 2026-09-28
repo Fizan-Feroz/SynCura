@@ -113,6 +113,18 @@ def test_admin_status_reports_throughput():
     assert rt['ingest_per_min_1m'] >= 0 and rt['ingest_per_min_5m'] >= 0
 
 
+def test_replay_sample_loads_engine_beds():
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    client = TestClient(app_module.app)
+    r = client.post('/replay/sample')
+    assert r.status_code == 200
+    body = r.json()
+    assert body['stored'] == 12 and body['source'] == 'simulation-engine-snapshot'
+    patients = client.get('/patients').json()['patients']
+    assert len(patients) > 0
+
+
 def test_ingest_roundtrip():
     from fastapi.testclient import TestClient
     import backend.app as app_module
