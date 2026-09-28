@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 import json
 import logging
@@ -21,11 +21,13 @@ load_dotenv()
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 
 try:
+    from backend.dashboard import DASHBOARD_HTML
     from backend.db import init_db, insert_vital, get_latest_vitals, get_top_patients
     from backend.inference import get_engine, FEATURES
     from backend.simulation import get_sim_engine
     from backend.training import training_manager
 except ImportError:
+    from dashboard import DASHBOARD_HTML
     from db import init_db, insert_vital, get_latest_vitals, get_top_patients
     from inference import get_engine, FEATURES
     from simulation import get_sim_engine
@@ -276,6 +278,12 @@ class TrainingConfig(BaseModel):
     stride: int = 15
     label_mode: str = "proximity"
     horizon_hours: float = 12.0
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def dashboard():
+    """Human-readable status page. Renders the same data as /admin/status."""
+    return HTMLResponse(DASHBOARD_HTML)
 
 
 @app.get("/health")
