@@ -20,7 +20,7 @@ import warnings
 import numpy as np
 import torch
 
-from ml.dataset import carry_forward
+from ml.dataset import SERVING_FEATURES, carry_forward
 
 
 # Determine model path: allow override via MODEL_PATH env var, check common paths,
@@ -35,9 +35,8 @@ if not os.path.exists(DEFAULT_MODEL_PATH):
         if runs:
             DEFAULT_MODEL_PATH = runs[0]
 
-# Feature names used by the model (must match training)
-FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-            'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+# Local alias for the canonical serving contract. Do not retype the list here.
+FEATURES = SERVING_FEATURES
 
 # Payload keys accepted from devices / older clients, mapped to model names.
 # The ESP32 sketch historically sent lowercase keys ("hr", "spo2") which the
@@ -82,9 +81,16 @@ def _to_float(value):
     return f if math.isfinite(f) else np.nan
 
 
-def _load_json_scaler(path):
+def _load_json_scaler(path, member=None):
     with open(path) as f:
         scaler = json.load(f)
+    features = list(scaler.get('features', []))
+    if features != list(SERVING_FEATURES):
+        where = f' for member {member}' if member else ''
+        raise ValueError(
+            f'Scaler {path}{where} has features {features}, '
+            f'but the serving contract requires {list(SERVING_FEATURES)}'
+        )
     mean = np.array(scaler['mean'], dtype=np.float32)
     std = np.array(scaler['std'], dtype=np.float32) + 1e-6
     return mean, std
@@ -170,7 +176,7 @@ class RiskScoreEngine:
                     m.eval()
                     self.models.append(m)
                     try:
-                        self.member_scalers.append(_load_json_scaler(member['scaler']))
+                        self.member_scalers.append(_load_json_scaler(member['scaler'], member['id']))
                     except Exception as e:
                         print(f"[Inference] Warning: scaler load failed for {member['id']}: {e}")
                         self.member_scalers.append((None, None))
@@ -242,6 +248,12 @@ class RiskScoreEngine:
                        if os.path.exists(m.get('checkpoint', ''))]
             if len(members) == len(manifest['members']):
                 self.window_size = int(manifest.get('window_minutes', self.window_size))
+                try:
+                    for member in members:
+                        _load_json_scaler(member['scaler'], member['id'])
+                except Exception as e:
+                    print(f'[Inference] Warning: manifest scaler incompatible: {e}; using directory scan')
+                    return None
                 return members
             print('[Inference] Warning: manifest checkpoints missing; using directory scan')
         return None

@@ -18,8 +18,10 @@ ICU patients". Requires a PhysioNet account plus a signed DUA; never redistribut
 
 ### The 12 model features
 
-The canonical order lives in `backend/inference.py:39` and is mirrored as
-`FEATURES_12` in each sweep script. Training and serving **must** agree on it.
+The canonical order is defined once as `SERVING_FEATURES` in `ml/dataset.py`.
+`ml/train.py`, `backend/inference.py`, `ml/challenge2019_to_features.py`, and
+the serving-contract tests import it. Older sweep scripts may retain local
+copies for historical runs. Training and serving **must** agree on it.
 
 | # | Feature | PhysioNet parameter | Notes |
 |---|---------|--------------------|-------|
@@ -66,7 +68,10 @@ HCO3, Mg, HCT, pH, PaO2, PaCO2) scored worse (0.787 vs 0.807) and was dropped.
 - 20,336 ICU stays, hourly, pipe-delimited `.psv`, per-row `SepsisLabel` (~9% positive).
 - Covers **11 of the 12** features. The missing one is `GCS` (position 7 in the
   table above); there is no GCS column in the 2019 schema.
-- Needs its own loader, `challenge2019_to_features.py`, which is not written yet.
+- Loader: `ml/challenge2019_to_features.py`. It emits canonical-order frames
+  through `ml/dataset.py` windowing, but collapses per-hour `SepsisLabel` into a
+  patient-level sepsis-onset flag. Policy: cleared for `train`, not for
+  `deploy_train`.
 
 ## MIMIC-III demo (100 patients / 136 stays) and MIMIC-IV demo (100 / 140) — ETL testbeds (real)
 

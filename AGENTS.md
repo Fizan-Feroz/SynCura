@@ -47,7 +47,9 @@ PROJ/
 ├── ml/                          # Machine learning pipeline
 │   ├── train.py                 # Main training script (early stopping, SpO2, attention)
 │   ├── train_lstm.py            # LSTMModel + AttentionLSTMModel definitions
-│   ├── dataset.py               # PhysioNet data loader, creates sliding windows
+│   ├── dataset.py               # PhysioNet data loader, sliding windows, SERVING_FEATURES
+│   ├── challenge2019_to_features.py # Challenge 2019 loader; sepsis-onset labels, train-only
+│   ├── dataset_registry.py      # Dataset capability policy enforced by loaders
 │   ├── preprocess.py            # Z-score normalization, NaN interpolation
 │   ├── explain.py               # SHAP-based feature importance (KernelSHAP)
 │   ├── eval_shap.py             # (Legacy) SHAP evaluation stub
@@ -87,7 +89,7 @@ PROJ/
 │
 ├── frontend/                    # React 18 + Vite + plain CSS (NO Tailwind)
 │   ├── src/
-│   │   ├── App.jsx              # Router, lazy routes, theme state (light/dark -> paper/monitor)
+│   │   ├── App.jsx              # Router, lazy routes, theme state (light/dark -> paper/monitor CSS values)
 │   │   ├── main.jsx             # Entrypoint; CSS load order matters, tokens.css first
 │   │   ├── simulationContext.jsx # Client-side simulation engine (synthetic, not backend-fed)
 │   │   ├── api.js               # Backend HTTP client
@@ -202,13 +204,13 @@ Notes:
 
 - **Python**: Follow existing style, no comments unless complex logic
 - **JavaScript/JSX**: React functional components with hooks, styled with the plain CSS in `frontend/src/styles/` using BEM-ish class names. There is no Tailwind and no CSS-in-JS. Full design system: `THEME.md`.
-- **Frontend theme**: `frontend/src/theme/tokens.css` is the single source of colour, type, space, radius, and motion. Two modes: `paper` (light) and `monitor` (dark). Do not hardcode hex outside `tokens.css` and `styles/film.css` (the hero film is deliberately its own dark stage), and do not introduce page-local colour systems.
+- **Frontend theme**: `frontend/src/theme/tokens.css` is the single source of colour, type, space, radius, and motion. The switch is labelled **Light**/**Dark**; the underlying CSS values are `paper` and `monitor`. Do not hardcode hex outside `tokens.css` and `styles/film.css` (the hero film is deliberately its own dark stage), and do not introduce page-local colour systems.
 - **Frontend type**: one family (Archivo Variable, self-hosted). Change hierarchy with the width axis (`--wide` / `--normal` / `--narrow`), never by adding a second typeface.
 - **Frontend motion**: use `REDUCED` / `MOTION_OK` from `frontend/src/motion/gsap.js` and register animations inside `mm.add(MOTION_OK, ...)`. Never use `transition: all`; animate only explicit properties. A new animation without a reduced-motion path is a bug.
 - **Frontend risk tiers**: the thresholds live in `frontend/src/components/trace.js` (`riskTone`, 45/70/85). Use those helpers; do not re-derive tiers in a component.
 - **Frontend honesty**: keep the simulation banner, research-prototype qualifiers, and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence. The vitals on screen are client-side synthetic data from `simulationContext.jsx`, not a live patient feed.
 - **No new dependencies** without checking existing ones first
-- **Model compatibility**: always update both `train.py` AND `inference.py` when changing features/architecture. The 12-feature order is duplicated in `ml/train.py` (`SERVING_FEATURES`) and `backend/inference.py` (`FEATURES`); `train.py` only enforces agreement when `--deploy` is passed, so a plain training run can silently produce an unservable model.
+- **Model compatibility**: always update both `train.py` AND `inference.py` when changing features/architecture. The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; both files import it. Saved scalers are rejected at load when their `features` list does not match exactly.
 - **Thread safety**: RiskScoreEngine uses `threading.Lock()` for concurrent access
 
 ## Testing
@@ -235,7 +237,7 @@ npm run build     # catches broken imports and CSS ordering
 ## Known Issues
 
 - Frontend simulation is client-side only (does not read back from backend)
-- The 12-feature order lives in two places (`ml/train.py` and `backend/inference.py`) and is only cross-checked under `--deploy`; see Code Conventions
+- The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; older sweep scripts may retain historical local copies. `backend/tests/test_audit_fixes.py` checks the shared contract and saved-artifact order.
 - No unit tests exist yet
 - `chart.js` and `socket.io-client` were removed from `frontend/package.json` in the redesign; do not reintroduce them, the UI draws SVG traces directly
 - `ml/models/*.pt` is gitignored, so scratch checkpoints need `git add -f`. The deployed

@@ -19,6 +19,10 @@ monitor, and the whole token set is built on that split.
 | `light` | `paper` | ECG chart paper: red millimetre grid, teal-black ink | yes |
 | `dark` | `monitor` | Bedside monitor: dark screen, standard parameter colours | no |
 
+The user-facing labels are **Light** and **Dark**. `paper` and `monitor` are
+internal CSS values only — the clinical-instrument metaphor is carried by the
+visuals, not by the switch text.
+
 Both token blocks are declared in `src/theme/tokens.css`. The `paper` values are
 defined twice, on `:root` and on `[data-theme='paper']` (lines 8 and 45), so
 they apply before React hydrates; `monitor` is the `[data-theme='monitor']` block
@@ -31,9 +35,20 @@ scrollbars follow.
 3. both wrapped in `try/catch` because storage can throw in private mode
 
 `App.jsx:45-52` writes the `data-theme` attribute and persists on every change.
-The switch itself is `ThemeSwitch` in `AppShell.jsx`, a `role="group"`
-segmented control with `aria-pressed` on each button and the labels **Paper** and
-**Monitor**, not "light"/"dark".
+
+**The switch** (`ThemeSwitch` in `AppShell.jsx`) is a `role="group"` segmented
+control with `aria-pressed` per button. It is animated in two layers:
+- a sliding thumb, positioned from `data-side` and an `is-moving` class
+- a `document.startViewTransition` crossfade in `App.jsx`'s `toggleTheme`, which
+  falls back to a plain state update when the API is unavailable
+
+Clicking a side sets an `is-moving` state immediately, then commits the actual
+theme switch after a 600 ms debounce, so the thumb animates first and the
+repaint lands once. The crossfade itself is `0.2s`
+(`styles/base.css:248-252`, `::view-transition-old/new(root)`), and
+`base.css:254-259` disables it under `prefers-reduced-motion: reduce`. Keep the
+JS debounce and the CSS duration in step — note the comment above that rule still
+says 0.25s while the value is 0.2s.
 
 ---
 
@@ -233,9 +248,10 @@ across renders. `seriesPath` is the real-data variant.
 
 Worth knowing, but none of it is broken:
 
-- `App.jsx` uses `light`/`dark` as React state while CSS uses `paper`/`monitor`.
-  The mapping is in one place (`App.jsx:46`), and `index.html` duplicates it
-  pre-paint. Keep both in sync if you rename anything.
+- `App.jsx` uses `light`/`dark` as React state, `AppShell.jsx` uses `side`, and
+  CSS uses `paper`/`monitor` as the `data-theme` values. Three vocabularies for
+  two modes. The mappings are in `App.jsx:46` and `AppShell.jsx`'s `choose`, and
+  `index.html` duplicates the attribute mapping pre-paint. Keep them in sync.
 - `components/` holds one `.jsx` per route, all lazy-loaded via `React.lazy` in
   `App.jsx:6-13`. `trace.js` is the exception: it is a module, not a component.
 - Three dated completion records (`FINAL_SUMMARY.md`, `IMPLEMENTATION_COMPLETE.md`,

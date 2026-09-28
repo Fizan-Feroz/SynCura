@@ -29,9 +29,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from ml.dataset import SERVING_FEATURES as FEATURES
+
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-            'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
 HEALTHY_VITALS = {'HR': 75, 'RespRate': 16, 'Temp': 36.8, 'NISysABP': 120, 'NIDiasABP': 70, 'SpO2': 98}
 SICK = {'HR': 135, 'RespRate': 32, 'Temp': 39.5, 'NISysABP': 82, 'NIDiasABP': 45, 'SpO2': 86, 'GCS': 8}
 
@@ -550,6 +550,40 @@ def test_explain_real_shap_runs(tmp_db):
 
 
 # ------------------------------------------------------------- 10. misc fixes
+
+def test_serving_feature_contract_is_shared():
+    from ml.dataset import SERVING_FEATURES
+    import ml.train as train_module
+    import backend.inference as inference_module
+
+    assert train_module.SERVING_FEATURES is SERVING_FEATURES
+    assert inference_module.FEATURES is SERVING_FEATURES
+
+
+@pytest.mark.parametrize('path', [
+    'ml/scaler.json',
+    'ml/scaler_combo8k.json',
+    'ml/deployed_manifest.json',
+])
+def test_saved_serving_artifacts_use_canonical_features(path):
+    from ml.dataset import SERVING_FEATURES
+    with open(os.path.join(REPO, path)) as f:
+        assert list(json.load(f)['features']) == list(SERVING_FEATURES)
+
+
+def test_scaler_with_wrong_feature_order_is_rejected(tmp_path):
+    from ml.dataset import SERVING_FEATURES
+    import backend.inference as inference_module
+
+    path = tmp_path / 'bad-order-scaler.json'
+    path.write_text(json.dumps({
+        'features': list(reversed(SERVING_FEATURES)),
+        'mean': [0.0] * len(SERVING_FEATURES),
+        'std': [1.0] * len(SERVING_FEATURES),
+    }))
+    with pytest.raises(ValueError, match='serving contract requires'):
+        inference_module._load_json_scaler(str(path), 'test-member')
+
 
 def test_cors_wildcard_does_not_allow_credentials():
     from fastapi.testclient import TestClient

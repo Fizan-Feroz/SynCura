@@ -291,7 +291,7 @@ Simulation and live modes can share visualization components, but they should us
 | Priority | Area | Finding | Required response |
 |---|---|---|---|
 | P0 | Data integrity | The dashboard displays local simulated risk rather than the score returned by backend inference | Separate simulation and live data modes at the state and component levels |
-| P0 | Feature contract (serving) | The 12-feature order is duplicated in `ml/train.py` and `backend/inference.py` and is only cross-checked under `--deploy`, so a plain run can produce an unservable model | Import one shared constant; add a test that asserts the scaler feature order matches |
+| P0 | Feature contract (serving) | *(resolved)* `SERVING_FEATURES` is defined once in `ml/dataset.py` and imported by training, serving, and the Challenge 2019 loader; mismatched scalers are rejected and contract tests cover the order | Done |
 | P0 | Reliability | No route error boundary, explicit 404 view, or consistent request timeout/cancellation | Add failure containment and predictable recovery paths |
 | P1 | API consistency | Request behavior differs between `fetch` and Axios | Consolidate transport, timeout, JSON, and error handling in one client |
 | P1 | Testing | No frontend unit, integration, accessibility, or end-to-end suite | Add focused tests for simulation math, API states, routes, and critical workflows |

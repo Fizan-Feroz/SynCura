@@ -24,6 +24,14 @@ PARAMETER_ALIASES = {
     'SpO2': ['SaO2'],
 }
 
+# Canonical serving feature contract.
+#
+# Training, serving, loaders, and tests must import this list instead of
+# retyping it. Feature order is significant: saved scalers, checkpoints, and
+# serving vectors are all positional.
+SERVING_FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
+                    'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+
 
 def carry_forward(window, initial=None):
     """Forward-fill a (T, F) window, seeded with last-known values from before it.

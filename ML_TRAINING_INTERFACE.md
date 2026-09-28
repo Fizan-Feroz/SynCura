@@ -27,9 +27,18 @@ Starts a new training job with the provided configuration.
   "batch_size": 32,
   "learning_rate": 0.001,
   "max_patients": 100,
-  "vital_features": ["HR", "RespRate", "Temp", "NISysABP", "NIDiasABP"]
+  "vital_features": ["HR", "RespRate", "Temp", "NISysABP", "NIDiasABP", "SpO2",
+                     "GCS", "BUN", "Creatinine", "WBC", "Platelets", "Glucose"],
+  "window": 90,
+  "hidden_size": 96
 }
 ```
+
+Defaults match the serving contract (12 features in order, 90-min window,
+hidden 96). Deviating configs train into isolated job artifacts and are
+flagged non-promotable. Only one job runs at a time (second start → 409);
+job IDs are UUID-suffixed; artifacts live at `ml/models/<job_id>.*` and
+never overwrite serving files.
 
 **Response:**
 ```json
