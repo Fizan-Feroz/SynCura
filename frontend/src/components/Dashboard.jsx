@@ -126,6 +126,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
     setDataSource,
     liveError,
     liveMeta,
+    activeScenarioLabel,
     reloadLive,
     reloadReplay,
   } = useSimulation()
