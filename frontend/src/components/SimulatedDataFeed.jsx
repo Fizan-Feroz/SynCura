@@ -1,9 +1,31 @@
 import React from 'react'
-import { useSimulation } from '../simulationContext'
+import { BackendStatusPanel, useSimulation } from '../simulationContext'
 import { riskLabel, riskTone } from './trace'
 
 export default function SimulatedDataFeed() {
-  const { activeScenarioLabel, patientQueue, lastUpdated, isPaused, toggleSimulation, resetSimulation } = useSimulation()
+  const {
+    activeScenarioLabel,
+    patientQueue,
+    lastUpdated,
+    isPaused,
+    toggleSimulation,
+    resetSimulation,
+    backendOnline,
+    backendChecking,
+    backendError,
+    retryBackend,
+  } = useSimulation()
+
+  if (!backendOnline) {
+    return (
+      <BackendStatusPanel
+        title="Data feed"
+        backendChecking={backendChecking}
+        backendError={backendError}
+        retryBackend={retryBackend}
+      />
+    )
+  }
 
   return (
     <div className="page">

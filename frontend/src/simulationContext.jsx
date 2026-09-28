@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import mimicDemoPatients from './mimicDemoPatients.json'
 import { API_URL } from './api'
 
@@ -78,6 +78,9 @@ export const SCENARIOS = {
 }
 
 const SimulationContext = createContext(null)
+
+const BACKEND_CHECK_MS = 15000
+const BACKEND_TIMEOUT_MS = 10000
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
@@ -218,11 +221,53 @@ export function SimulationProvider({ children }) {
   const [patientQueue, setPatientQueue] = useState(() => seedIcuEnvironment(DEFAULT_PATIENTS))
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [isPaused, setIsPaused] = useState(true)
+  const [backendStatus, setBackendStatus] = useState('checking')
+  const [backendError, setBackendError] = useState(null)
   const lastIngestTime = React.useRef({}) // Track last ingest time per patient
+
+  const checkBackend = useCallback(async () => {
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS)
+    try {
+      const response = await fetch(`${API_URL}/health`, { signal: controller.signal })
+      if (!response.ok) throw new Error(`GET /health -> ${response.status}`)
+      await response.json().catch(() => ({}))
+      setBackendStatus('online')
+      setBackendError(null)
+      return true
+    } catch (error) {
+      setBackendStatus('offline')
+      setBackendError(
+        error?.name === 'AbortError'
+          ? 'The backend did not respond within 10 seconds.'
+          : error?.message || 'The backend could not be reached.'
+      )
+      return false
+    } finally {
+      window.clearTimeout(timeoutId)
+    }
+  }, [])
+
+  // Synthetic display is only meaningful with a live backend. While the
+  // backend is unreachable, stop advancing the beds as well as ingesting them.
+  useEffect(() => {
+    let cancelled = false
+    let intervalId
+    const check = async () => {
+      if (document.visibilityState === 'hidden') return
+      if (!cancelled) await checkBackend()
+    }
+    check()
+    intervalId = window.setInterval(check, BACKEND_CHECK_MS)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [checkBackend])
 
   // Send vitals to backend for alert processing (with cooldown)
   useEffect(() => {
-    if (isPaused) return undefined
+    if (isPaused || backendStatus !== 'online') return undefined
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'hidden') return
@@ -262,7 +307,7 @@ export function SimulationProvider({ children }) {
       setLastUpdated(new Date())
     }, 1000)
     return () => window.clearInterval(intervalId)
-  }, [activeScenario, isPaused])
+  }, [activeScenario, backendStatus, isPaused])
 
   const value = useMemo(
     () => ({
@@ -272,6 +317,10 @@ export function SimulationProvider({ children }) {
       patientQueue,
       lastUpdated,
       isPaused,
+      backendOnline: backendStatus === 'online',
+      backendChecking: backendStatus === 'checking',
+      backendError,
+      retryBackend: checkBackend,
       setActiveScenario,
       toggleSimulation: () => setIsPaused((current) => !current),
       resetSimulation: () => {
@@ -281,10 +330,43 @@ export function SimulationProvider({ children }) {
         setLastUpdated(new Date())
       },
     }),
-    [activeScenario, patientQueue, lastUpdated, isPaused]
+    [activeScenario, backendError, backendStatus, checkBackend, patientQueue, lastUpdated, isPaused]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>
+}
+
+export function BackendStatusPanel({ title, backendChecking, backendError, retryBackend }) {
+  if (backendChecking) {
+    return (
+      <div className="page">
+        <div className="skeleton" role="status">
+          <span className="sr-only">Checking the backend connection…</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="page">
+      <header className="page-head">
+        <div>
+          <h1>{title} unavailable</h1>
+          <p className="muted">The synthetic stream is turned off while the backend is unreachable.</p>
+        </div>
+        <div className="page-actions">
+          <button type="button" className="btn btn-primary btn-sm" onClick={retryBackend}>
+            Retry connection
+          </button>
+        </div>
+      </header>
+      <p className="notice notice-error" role="alert">
+        Backend unavailable. Live risk scores, model metrics, training jobs, and alert delivery need the
+        backend, so this view is stopped instead of showing simulated patients.
+      </p>
+      {backendError && <p className="muted small">{backendError}</p>}
+    </div>
+  )
 }
 
 export function useSimulation() {

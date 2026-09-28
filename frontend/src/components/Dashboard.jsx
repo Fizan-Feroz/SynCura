@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useSimulation } from '../simulationContext'
+import { BackendStatusPanel, useSimulation } from '../simulationContext'
 import { API_URL } from '../api'
 import { gsap, Flip, REDUCED } from '../motion/gsap'
 import AppShell from './AppShell'
@@ -152,6 +152,10 @@ export default function Dashboard({ theme, onToggleTheme }) {
     setActiveScenario,
     toggleSimulation,
     resetSimulation,
+    backendOnline,
+    backendChecking,
+    backendError,
+    retryBackend,
   } = useSimulation()
   const [selectedId, setSelectedId] = useState(patientQueue[0]?.patient_id)
   const [threshold, setThreshold] = useState(75)
@@ -228,6 +232,24 @@ export default function Dashboard({ theme, onToggleTheme }) {
   }, [patientQueue])
 
   const fmt = (v, pct = true) => (v == null ? 'n/a' : pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(3))
+
+  if (!backendOnline) {
+    return (
+      <AppShell
+        theme={theme}
+        onToggleTheme={onToggleTheme}
+        wide
+        status={{ live: false, label: backendChecking ? 'Checking backend' : 'Backend unavailable' }}
+      >
+        <BackendStatusPanel
+          title="Central station"
+          backendChecking={backendChecking}
+          backendError={backendError}
+          retryBackend={retryBackend}
+        />
+      </AppShell>
+    )
+  }
 
   return (
     <AppShell

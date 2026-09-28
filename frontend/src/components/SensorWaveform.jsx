@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { useSimulation } from '../simulationContext'
+import { BackendStatusPanel, useSimulation } from '../simulationContext'
 import { riskLabel, riskTone, seriesPath } from './trace'
 
 const CHANNELS = {
@@ -11,7 +11,7 @@ const CHANNELS = {
 const ORDER = ['HR', 'SpO2', 'Resp', 'Temp']
 
 export default function SensorWaveform() {
-  const { patientQueue } = useSimulation()
+  const { patientQueue, backendOnline, backendChecking, backendError, retryBackend } = useSimulation()
   const [shown, setShown] = useState({ HR: true, SpO2: true, Resp: true, Temp: true })
 
   const rows = useMemo(
@@ -28,6 +28,17 @@ export default function SensorWaveform() {
     [patientQueue]
   )
   const channels = ORDER.filter((k) => shown[k])
+
+  if (!backendOnline) {
+    return (
+      <BackendStatusPanel
+        title="Waveforms"
+        backendChecking={backendChecking}
+        backendError={backendError}
+        retryBackend={retryBackend}
+      />
+    )
+  }
 
   return (
     <div className="page">

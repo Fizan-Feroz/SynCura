@@ -224,7 +224,9 @@ uses `aria-pressed`; live status uses `aria-live="polite"`; table headers use
 **Honesty.** The simulation banner, research-prototype qualifier, and
 not-HIPAA-ready note stay visible. Do not add metrics, certifications, or
 clinical claims that the backend does not produce. The vitals shown are
-client-side simulation (`simulationContext.jsx`), not a patient feed.
+client-side simulation (`simulationContext.jsx`), not a patient feed. If
+`/health` is unreachable, the dynamic simulation views stop and show a
+backend-unavailable error rather than continuing silently.
 
 ---
 

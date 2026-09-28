@@ -56,7 +56,7 @@ frontend/         React 18 + Vite + plain CSS (no Tailwind; see THEME.md)
   index.html                Carries a pre-paint theme script to avoid a light-mode flash
   src/main.jsx              CSS load order matters: theme/tokens.css first
   src/App.jsx               Router, lazy routes, theme state (light/dark -> paper/monitor CSS values)
-  src/simulationContext.jsx Client-side simulation engine (synthetic) — NOT wired to backend
+  src/simulationContext.jsx Client-side synthetic engine; dashboard, waveforms, and data feed require /health and show backend-unavailable otherwise
   src/theme/tokens.css      All design tokens; only file with hex colour (film.css excepted)
   src/styles/               base, layout, landing, film, station, pages
   src/motion/gsap.js        GSAP plugins + REDUCED / MOTION_OK media queries
@@ -142,6 +142,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 - `RiskScoreEngine` (backend/inference.py) uses `threading.Lock()` — keep any changes thread-safe.
 - Frontend `simulationContext.jsx` is entirely client-side synthetic data; it does **not** read live
   scores back from the backend. Don't assume dashboard numbers reflect real `/scores` output.
+  When `/health` is unreachable, the dynamic simulation views stop and show a backend-unavailable error.
 - The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`.
   `ml/train.py`, `backend/inference.py`, and the Challenge 2019 loader import it.
   Do not retype the list; saved scalers whose `features` list differs are rejected.
