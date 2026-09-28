@@ -69,6 +69,7 @@ import glob
 import numpy as np
 import pandas as pd
 
+from ml.dataset import SERVING_FEATURES
 from ml.dataset_registry import require
 
 # Challenge 2019 PSV column -> SynCura SERVING_FEATURES name.
@@ -86,16 +87,12 @@ COLUMN_MAP = {
     'Platelets': 'Platelets',
     'Glucose': 'Glucose',
 }
-SERVING_FEATURES_ORDER = [
-    'HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-    'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose',
-]
 
 
 def _load_one_psv(path):
     """Load one Challenge-2019 patient .psv, return (df_pivot, label, patient_id).
 
-    df_pivot: minute-indexed DataFrame with SERVING_FEATURES_ORDER columns
+    df_pivot: minute-indexed DataFrame with SERVING_FEATURES columns
     (GCS all-NaN), matching ml.dataset.load_physionet_file's output shape.
     label: 1 if SepsisLabel is ever 1 during the stay, else 0.
     """
@@ -128,7 +125,7 @@ def _load_one_psv(path):
 
     # Add GCS as an all-NaN column and enforce the canonical column order.
     per_minute['GCS'] = np.nan
-    per_minute = per_minute.reindex(columns=SERVING_FEATURES_ORDER)
+    per_minute = per_minute.reindex(columns=SERVING_FEATURES)
 
     return per_minute, label, patient_id
 

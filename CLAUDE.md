@@ -142,9 +142,9 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 - `RiskScoreEngine` (backend/inference.py) uses `threading.Lock()` — keep any changes thread-safe.
 - Frontend `simulationContext.jsx` is entirely client-side synthetic data; it does **not** read live
   scores back from the backend. Don't assume dashboard numbers reflect real `/scores` output.
-- The 12-feature order is duplicated in `ml/train.py` (`SERVING_FEATURES`) and `backend/inference.py`
-  (`FEATURES`), and only cross-checked when `train.py` runs with `--deploy`. A plain run can produce
-  an unservable model — change both if you change features.
+- The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`.
+  `ml/train.py`, `backend/inference.py`, and the Challenge 2019 loader import it.
+  Do not retype the list; saved scalers whose `features` list differs are rejected.
 - No automated test suite exists yet (backend or ML).
 - `.env` holds secrets (Discord webhook, etc.) — never print or commit its contents; `.env.example` is the template.
 

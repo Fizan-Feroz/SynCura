@@ -25,12 +25,10 @@ from sklearn.model_selection import GroupShuffleSplit
 import torch
 from tqdm import tqdm
 
-from ml.dataset import load_and_create_sequences
+from ml.dataset import load_and_create_sequences, SERVING_FEATURES
 from ml.train_lstm import train as quick_train, AttentionLSTMModel
 
-# Serving contract (backend/inference.py builds exactly this input).
-SERVING_FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-                    'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+# Serving window/hidden-size contract. Feature order comes from ml.dataset.
 SERVING_WINDOW = 90
 SERVING_HIDDEN = 96
 DEPLOY_MODEL_PATH = os.path.join('ml', 'models', 'lstm_baseline.pt')

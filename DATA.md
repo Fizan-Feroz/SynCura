@@ -36,7 +36,7 @@ data/
 ### 2. Challenge 2019 (sepsis) set A — scale-up data (real)
 - 20,336 ICU stays, hourly rows, pipe-delimited `.psv`, per-hour `SepsisLabel` (~9% positive).
 - Maps to 11/12 features (HR, O2Sat, Temp, SBP, DBP, Resp, BUN, Creatinine, Glucose, WBC, Platelets; **no GCS** — the 2019 schema has no GCS column).
-- Use: second training corpus / deterioration-label experiments. Needs its own loader (`challenge2019_to_features.py`, not yet written).
+- Use: second training corpus / deterioration-label experiments. Loader: `ml/challenge2019_to_features.py`, reusing the canonical `SERVING_FEATURES` order and `ml/dataset.py` windowing. Its patient-level label collapses `SepsisLabel`, so it means sepsis onset rather than in-hospital death; do not pool it with PhysioNet labels. Policy: cleared for `train`, not for `deploy_train` in `ml/dataset_registry.py`.
 
 ### 3. MIMIC-III demo (100 pts, 136 stays) + MIMIC-IV demo (100 pts, 140 stays) — ETL testbeds (real)
 - Full relational schemas (CHARTEVENTS/LABEVENTS + dictionaries); all 12 features verified present
