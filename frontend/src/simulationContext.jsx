@@ -80,7 +80,8 @@ export const SCENARIOS = {
 const SimulationContext = createContext(null)
 
 const BACKEND_CHECK_MS = 15000
-const BACKEND_TIMEOUT_MS = 10000
+const BACKEND_TIMEOUT_MS = 30000
+const BACKEND_VERSION_TIMEOUT_MS = 8000
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
@@ -225,17 +226,42 @@ export function SimulationProvider({ children }) {
   const [backendError, setBackendError] = useState(null)
   const [backendVersion, setBackendVersion] = useState(null)
   const lastIngestTime = React.useRef({}) // Track last ingest time per patient
+  const checkSeqRef = React.useRef(0)
+  const healthControllerRef = React.useRef(null)
+  const versionControllerRef = React.useRef(null)
 
-  const checkBackend = useCallback(async () => {
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), BACKEND_TIMEOUT_MS)
+  const checkBackend = useCallback(async ({ indicate = false } = {}) => {
+    // Serialize checks: abort the previous request and ignore any response
+    // that does not belong to the latest check. This keeps a slow retry from
+    // being overwritten by an earlier in-flight poll.
+    checkSeqRef.current += 1
+    const seq = checkSeqRef.current
+    const isCurrent = () => checkSeqRef.current === seq
+    healthControllerRef.current?.abort()
+    versionControllerRef.current?.abort()
+
+    const healthController = new AbortController()
+    healthControllerRef.current = healthController
+    const timeoutId = window.setTimeout(() => healthController.abort(), BACKEND_TIMEOUT_MS)
+    if (indicate && isCurrent()) {
+      setBackendStatus('checking')
+      setBackendError(null)
+    }
     try {
-      const response = await fetch(`${API_URL}/health`, { signal: controller.signal })
+      const response = await fetch(`${API_URL}/health`, { signal: healthController.signal })
       if (!response.ok) throw new Error(`GET /health -> ${response.status}`)
       await response.json().catch(() => ({}))
+      if (!isCurrent()) return false
+
       let deployedWebsiteVersion = null
+      const versionController = new AbortController()
+      versionControllerRef.current = versionController
+      const versionTimeoutId = window.setTimeout(
+        () => versionController.abort(),
+        BACKEND_VERSION_TIMEOUT_MS
+      )
       try {
-        const versionResponse = await fetch(`${API_URL}/version`, { signal: controller.signal })
+        const versionResponse = await fetch(`${API_URL}/version`, { signal: versionController.signal })
         if (versionResponse.ok) {
           const versionData = await versionResponse.json().catch(() => ({}))
           if (typeof versionData?.website_version === 'string') {
@@ -244,24 +270,32 @@ export function SimulationProvider({ children }) {
         }
       } catch {
         // Health is sufficient for online status; version tracking is best-effort.
+      } finally {
+        window.clearTimeout(versionTimeoutId)
+        if (versionControllerRef.current === versionController) versionControllerRef.current = null
       }
+      if (!isCurrent()) return false
       setBackendStatus('online')
       setBackendError(null)
       setBackendVersion(deployedWebsiteVersion)
       return true
     } catch (error) {
+      if (!isCurrent()) return false
       setBackendStatus('offline')
       setBackendVersion(null)
       setBackendError(
         error?.name === 'AbortError'
-          ? 'The backend did not respond within 10 seconds.'
+          ? `The backend did not respond within ${BACKEND_TIMEOUT_MS / 1000} seconds.`
           : error?.message || 'The backend could not be reached.'
       )
       return false
     } finally {
       window.clearTimeout(timeoutId)
+      if (healthControllerRef.current === healthController) healthControllerRef.current = null
     }
   }, [])
+
+  const retryBackend = useCallback(() => checkBackend({ indicate: true }), [checkBackend])
 
   // Synthetic display is only meaningful with a live backend. While the
   // backend is unreachable, stop advancing the beds as well as ingesting them.
@@ -270,6 +304,9 @@ export function SimulationProvider({ children }) {
     let intervalId
     const check = async () => {
       if (document.visibilityState === 'hidden') return
+      // Never start a scheduled poll while another check is running. Manual
+      // retries abort the in-flight check and take priority instead.
+      if (healthControllerRef.current) return
       if (!cancelled) await checkBackend()
     }
     check()
@@ -336,7 +373,7 @@ export function SimulationProvider({ children }) {
       backendChecking: backendStatus === 'checking',
       backendError,
       backendVersion,
-      retryBackend: checkBackend,
+      retryBackend,
       setActiveScenario,
       toggleSimulation: () => setIsPaused((current) => !current),
       resetSimulation: () => {
@@ -346,7 +383,7 @@ export function SimulationProvider({ children }) {
         setLastUpdated(new Date())
       },
     }),
-    [activeScenario, backendError, backendStatus, backendVersion, checkBackend, patientQueue, lastUpdated, isPaused]
+    [activeScenario, backendError, backendStatus, backendVersion, retryBackend, patientQueue, lastUpdated, isPaused]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>
