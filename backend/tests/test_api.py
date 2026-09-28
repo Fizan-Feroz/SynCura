@@ -99,6 +99,20 @@ def test_version_endpoint_tracks_website_and_model():
     assert 'git_commit' in body
 
 
+def test_admin_status_reports_throughput():
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    client = TestClient(app_module.app)
+    r = client.get('/admin/status')
+    assert r.status_code == 200
+    rt = r.json()['runtime']
+    for key in ('ingest_count', 'last_ingest_time', 'ingest_per_min_1m',
+                'ingest_per_min_5m', 'ingest_per_min_avg'):
+        assert key in rt, f'missing throughput key: {key}'
+    assert isinstance(rt['ingest_count'], int) and rt['ingest_count'] >= 0
+    assert rt['ingest_per_min_1m'] >= 0 and rt['ingest_per_min_5m'] >= 0
+
+
 def test_ingest_roundtrip():
     from fastapi.testclient import TestClient
     import backend.app as app_module

@@ -6,11 +6,11 @@ import json
 import logging
 import os
 import platform
-import sys
 import threading
 import queue
 import requests
 import time
+from collections import deque
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -61,6 +61,8 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START_TIME = time.time()
 INGEST_COUNT = 0
 LAST_INGEST_TIME = None
+# Timestamps of recent ingests (capped) for throughput rates. Guarded by _INGEST_LOCK.
+_INGEST_TIMES = deque(maxlen=1200)
 _INGEST_LOCK = threading.Lock()
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "120"))
 # Minimum risk required to send risk-based Discord alerts (0-100)
@@ -112,6 +114,28 @@ def uptime_human(seconds=None):
     if minutes:
         return f"{minutes}m {secs}s"
     return f"{secs}s"
+
+
+def runtime_throughput():
+    """Throughput snapshot for the admin panel: totals plus 1-min, 5-min, and
+    since-boot ingest rates. Entries older than 5 minutes are pruned on read."""
+    now = time.time()
+    with _INGEST_LOCK:
+        while _INGEST_TIMES and now - _INGEST_TIMES[0] > 300:
+            _INGEST_TIMES.popleft()
+        recent = list(_INGEST_TIMES)
+        total = INGEST_COUNT
+        last = LAST_INGEST_TIME
+    per_min_1m = sum(1 for t in recent if now - t <= 60)
+    per_min_5m = round(len(recent) / 5, 2)
+    uptime_min = max(uptime_seconds() / 60, 1 / 60)
+    return {
+        "ingest_count": total,
+        "last_ingest_time": last,
+        "ingest_per_min_1m": per_min_1m,
+        "ingest_per_min_5m": per_min_5m,
+        "ingest_per_min_avg": round(total / uptime_min, 2),
+    }
 
 
 def send_discord_alert(message: str):
@@ -291,9 +315,6 @@ def admin_status():
     """
     model_loaded = inference_engine.model is not None or bool(inference_engine.models)
     model = deployed_model_info()
-    with _INGEST_LOCK:
-        ingest_count = INGEST_COUNT
-        last_ingest = LAST_INGEST_TIME
     return {
         "status": "ok" if model_loaded else "degraded",
         "model_loaded": model_loaded,
@@ -318,10 +339,7 @@ def admin_status():
             "degraded": inference_engine.degraded,
             "load_error": inference_engine.load_error,
         },
-        "runtime": {
-            "ingest_count": ingest_count,
-            "last_ingest_time": last_ingest,
-        },
+        "runtime": runtime_throughput(),
     }
 
 
@@ -344,8 +362,10 @@ def ingest_vital(vital: VitalRecord):
     insert_vital(vital_dict)
     global INGEST_COUNT, LAST_INGEST_TIME
     with _INGEST_LOCK:
+        now = time.time()
         INGEST_COUNT += 1
-        LAST_INGEST_TIME = time.time()
+        LAST_INGEST_TIME = now
+        _INGEST_TIMES.append(now)
     _dispatch_discord_live_alerts(vital_dict, risk_score)
 
     return {"patient_id": vital_dict['patient_id'], "risk_score": risk_score, "stored": True}

@@ -83,7 +83,12 @@ export default function AdminPanel() {
       setStatus(payload)
       setHealth(payload ? { status: payload.status, model_loaded: payload.model_loaded } : healthPayload)
       setVersion(versionPayload)
-      setHistory((prev) => [...prev.slice(-(HISTORY_LIMIT - 1)), { t: checkedAt, latencyMs, online: true }])
+      setHistory((prev) => [...prev.slice(-(HISTORY_LIMIT - 1)), {
+        t: checkedAt,
+        latencyMs,
+        online: true,
+        ingests: typeof payload?.runtime?.ingest_count === 'number' ? payload.runtime.ingest_count : null,
+      }])
       if (lastOnline.current === false) recordEvent(true, `Recovered in ${latencyMs} ms`)
       lastOnline.current = true
     } catch (error) {
@@ -124,6 +129,39 @@ export default function AdminPanel() {
     if (values.length < 2) return ''
     return seriesPath(values, 560, 120, 8)
   }, [history])
+
+  const throughput = useMemo(() => {
+    const rates = []
+    for (let i = 1; i < history.length; i++) {
+      const a = history[i - 1]
+      const b = history[i]
+      if (typeof a.ingests === 'number' && typeof b.ingests === 'number') {
+        const dtMin = (b.t - a.t) / 60000
+        // A counter drop means the backend restarted — clamp, don't go negative.
+        if (dtMin > 0) rates.push(Math.max(0, (b.ingests - a.ingests) / dtMin))
+      }
+    }
+    if (!rates.length) return { rates, latest: null, avg: null }
+    const sum = rates.reduce((x, y) => x + y, 0)
+    return { rates, latest: rates[rates.length - 1], avg: sum / rates.length }
+  }, [history])
+
+  const throughputSpark = useMemo(() => {
+    if (throughput.rates.length < 2) return ''
+    const max = Math.max(...throughput.rates, 1)
+    return seriesPath(throughput.rates, 560, 120, 8, [0, max])
+  }, [throughput])
+
+  function formatAgo(tsSeconds) {
+    if (tsSeconds == null) return '—'
+    const secs = Math.max(0, Math.round(Date.now() / 1000 - tsSeconds))
+    if (secs < 60) return `${secs}s ago`
+    const mins = Math.floor(secs / 60)
+    if (mins < 60) return `${mins}m ago`
+    return `${Math.floor(mins / 60)}h ${mins % 60}m ago`
+  }
+
+  const runtime = status?.runtime || {}
 
   const backend = status?.backend || {}
   const model = status?.model || {}
@@ -172,6 +210,33 @@ export default function AdminPanel() {
             <div><dt>Sampled uptime</dt><dd className="num">{stats.uptimePct == null ? '—' : `${stats.uptimePct}%`}</dd></div>
             <div><dt>Model loaded</dt><dd className="num">{String(model.model_loaded ?? health?.model_loaded ?? '—')}</dd></div>
           </dl>
+        </section>
+
+        <section className="monitor" aria-label="Throughput">
+          <div className="monitor-head">
+            <strong>Throughput · ingests/min</strong>
+            <span className="monitor-risk num">
+              {runtime.ingest_per_min_1m != null
+                ? `${runtime.ingest_per_min_1m}/min`
+                : throughput.latest == null ? '—' : `${throughput.latest.toFixed(1)}/min`}
+            </span>
+          </div>
+          <div className="admin-latency">
+            {throughputSpark ? (
+              <svg viewBox="0 0 560 120" role="img" aria-label="Ingest rate history chart">
+                <path d={throughputSpark} className="admin-spark" />
+              </svg>
+            ) : (
+              <p className="muted small">Collecting samples — leave this page open while probes run every 5 s.</p>
+            )}
+            <dl className="admin-facts admin-facts-row">
+              <div><dt>Now (1-min)</dt><dd className="num">{runtime.ingest_per_min_1m ?? '—'}</dd></div>
+              <div><dt>5-min avg</dt><dd className="num">{runtime.ingest_per_min_5m ?? '—'}</dd></div>
+              <div><dt>Session avg</dt><dd className="num">{throughput.avg == null ? '—' : throughput.avg.toFixed(1)}</dd></div>
+              <div><dt>Total</dt><dd className="num">{runtime.ingest_count ?? '—'}</dd></div>
+              <div><dt>Last ingest</dt><dd className="num">{formatAgo(runtime.last_ingest_time)}</dd></div>
+            </dl>
+          </div>
         </section>
 
         <section className="monitor" aria-label="Latency">

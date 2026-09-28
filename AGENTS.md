@@ -168,6 +168,7 @@ Patient Vitals --> [Backend /ingest] --> [SQLite DB]
 |--------|------|-------------|
 | GET | `/health` | API status |
 | GET | `/version` | Website version, deployed model, and git commit |
+| GET | `/admin/status` | Uptime, hosting, model, and ingest throughput for the admin panel |
 | POST | `/ingest` | Ingest vital JSON, returns risk score |
 | GET | `/patients` | Top 6 patients by risk score |
 | GET | `/patient/{id}` | Patient details + recent vitals |

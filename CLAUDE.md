@@ -124,6 +124,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 |---|---|---|
 | GET | `/health` | status |
 | GET | `/version` | website version, deployed model, and git commit |
+| GET | `/admin/status` | uptime, hosting, model, ingest throughput (admin panel) |
 | POST | `/ingest` | vital JSON in, `{patient_id, risk_score, stored}` out |
 | GET | `/patients` | top 6 by risk |
 | GET | `/patient/{id}` | details + recent vitals |
