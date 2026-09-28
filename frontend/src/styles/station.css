@@ -27,10 +27,16 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+  flex: 1 1 100%;
+}
+
+.station-live {
+  margin-left: auto;
 }
 
 .station-actions {
   display: flex;
+  align-items: center;
   gap: var(--space-2);
 }
 

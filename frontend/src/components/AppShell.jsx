@@ -42,7 +42,7 @@ export function ThemeSwitch({ theme, onToggleTheme }) {
   )
 }
 
-export function TopBar({ theme, onToggleTheme, landing = false, status }) {
+export function TopBar({ theme, onToggleTheme, landing = false }) {
   const { backendVersion } = useSimulation()
   const versionLabel =
     backendVersion && backendVersion !== APP_VERSION
@@ -74,23 +74,17 @@ export function TopBar({ theme, onToggleTheme, landing = false, status }) {
         <span className="app-version num" aria-label={versionLabel}>
           {versionText}
         </span>
-        {status && (
-          <span className={`live-status ${status.live ? 'is-live' : ''}`} aria-live="polite">
-            <span className="live-dot" aria-hidden="true" />
-            {status.label}
-          </span>
-        )}
         <ThemeSwitch theme={theme} onToggleTheme={onToggleTheme} />
       </div>
     </header>
   )
 }
 
-export default function AppShell({ theme, onToggleTheme, status, children, wide = false }) {
+export default function AppShell({ theme, onToggleTheme, children, wide = false }) {
   return (
     <div className="app">
       <a className="skip-link" href="#main-content">Skip to main content</a>
-      <TopBar theme={theme} onToggleTheme={onToggleTheme} status={status} />
+      <TopBar theme={theme} onToggleTheme={onToggleTheme} />
       <main className={`app-main ${wide ? 'app-main-wide' : ''}`} id="main-content" tabIndex="-1">
         {children}
       </main>

@@ -239,7 +239,6 @@ export default function Dashboard({ theme, onToggleTheme }) {
         theme={theme}
         onToggleTheme={onToggleTheme}
         wide
-        status={{ live: false, label: backendChecking ? 'Checking backend' : 'Backend unavailable' }}
       >
         <BackendStatusPanel
           title="Central station"
@@ -256,7 +255,6 @@ export default function Dashboard({ theme, onToggleTheme }) {
       theme={theme}
       onToggleTheme={onToggleTheme}
       wide
-      status={{ live: !isPaused, label: isPaused ? 'Stream paused' : 'Streaming to backend' }}
     >
       <div className="station">
         <header className="station-head">
@@ -283,6 +281,10 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 Reset beds
               </button>
             </div>
+            <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
+              <span className="live-dot" aria-hidden="true" />
+              {isPaused ? 'Stream paused' : 'Streaming to backend'}
+            </span>
           </div>
         </header>
 
