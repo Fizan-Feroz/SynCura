@@ -1,122 +1,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { BackendStatusPanel, useSimulation } from '../simulationContext'
 import { API_URL } from '../api'
 import { gsap, Flip, REDUCED } from '../motion/gsap'
 import AppShell from './AppShell'
 import { riskLabel, riskTone, seriesPath } from './trace'
+import { buildAlerts, calculateNews2 } from './alerts'
 
 const RERANK_MS = 5000
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
-}
-
-function scoreContributions(vitals) {
-  return [
-    { name: 'Heart rate', value: (vitals.HR - 85) * 0.24 },
-    { name: 'SpO2', value: (92 - vitals.SpO2) * 1.7 },
-    { name: 'Respiratory rate', value: (vitals.Resp - 18) * 0.6 },
-    { name: 'Temperature', value: (vitals.Temp - 37) * 4.5 },
-  ].map((m) => ({ ...m, points: Number((m.value * 0.05).toFixed(2)) }))
-}
-
-function clinicalTermForDriver(name, vitals) {
-  switch (name) {
-    case 'Heart rate':
-      if (vitals.HR >= 100) return 'Tachycardia'
-      if (vitals.HR <= 60) return 'Bradycardia'
-      return 'Abnormal heart rate'
-    case 'SpO2':
-      return 'Hypoxemia'
-    case 'Respiratory rate':
-      return vitals.Resp >= 20 ? 'Tachypnea' : 'Abnormal breathing'
-    case 'Temperature':
-      return vitals.Temp >= 38 ? 'Fever' : 'Abnormal temperature'
-    default:
-      return name
-  }
-}
-
-function topClinicalPattern(vitals, count = 2) {
-  const terms = scoreContributions(vitals)
-    .slice()
-    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
-    .slice(0, count)
-    .map((m) => clinicalTermForDriver(m.name, vitals))
-  return [...new Set(terms)].join(' + ')
-}
-
-function buildAlerts(patients) {
-  // One alert per bed: the highest-severity active condition wins. When a bed
-  // escalates (e.g. warning -> critical), the new alert replaces the old one
-  // instead of stacking, so the list never shows stale repeats.
-  const alerts = []
-  patients.forEach((p) => {
-    const base = { key: `${p.patient_id}-alert`, bed: p.bed }
-    if (p.risk >= 90) {
-      alerts.push({
-        ...base,
-        level: 'critical',
-        title: 'Very high risk',
-        condition: `Pattern: ${topClinicalPattern(p.vitals).toLowerCase()}`,
-        signal: `Risk ${p.risk}% (alerts at 90%).`,
-        cause: 'The concerning vitals behind this score are shown above. Sensors can also misread — confirm the probe and repeat key readings before acting on numbers alone.',
-        action: 'See the patient now and follow your unit\u2019s escalation protocol.',
-      })
-      return
-    }
-    if (p.vitals.SpO2 <= 88) {
-      alerts.push({
-        ...base,
-        level: 'warning',
-        title: 'Hypoxemia',
-        signal: `Low oxygen: SpO2 ${p.vitals.SpO2}% — alert level is 88% or below.`,
-        cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
-        action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
-      })
-      return
-    }
-    if (p.vitals.Resp >= 30) {
-      alerts.push({
-        ...base,
-        level: 'warning',
-        title: 'Tachypnea',
-        signal: `Fast breathing: ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
-        cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
-        action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
-      })
-      return
-    }
-    if (p.vitals.Temp >= 39) {
-      alerts.push({
-        ...base,
-        level: 'info',
-        title: 'Fever',
-        signal: `High temperature: ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
-        cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
-        action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
-      })
-    }
-  })
-  return alerts.slice(0, 6)
-}
-
-function calculateNews2({ vitals: { HR, Resp, Temp, SpO2 } }) {
-  let score = 0
-  if (Resp <= 8 || Resp >= 25) score += 3
-  else if (Resp >= 21) score += 2
-  else if (Resp >= 9 && Resp <= 11) score += 1
-  if (SpO2 <= 91) score += 3
-  else if (SpO2 <= 93) score += 2
-  else if (SpO2 <= 95) score += 1
-  if (Temp <= 35) score += 3
-  else if (Temp >= 39.1) score += 2
-  else if (Temp >= 38.1) score += 1
-  if (HR <= 40 || HR >= 131) score += 3
-  else if (HR >= 111) score += 2
-  else if (HR >= 91 || HR <= 50) score += 1
-  return score
 }
 
 function hasDeteriorationEvent(p) {
@@ -182,7 +76,7 @@ function BedTile({ patient, selected, onSelect, threshold }) {
         className={`bed-tile tone-${tone} ${selected ? 'is-selected' : ''} ${over ? 'is-over' : ''}`}
         onClick={() => onSelect(patient.patient_id)}
         aria-pressed={selected}
-        aria-label={`${patient.bed}, patient ${patient.patient_id}, risk ${patient.risk} percent, ${riskLabel(patient.risk)}`}
+        aria-label={`${patient.bed}, patient ${patient.patient_id}, risk ${patient.risk} percent, ${riskLabel(patient.risk)}. Open profile.`}
       >
         <span className="bed-head">
           <span className="bed-name">{patient.bed}</span>
@@ -223,8 +117,12 @@ export default function Dashboard({ theme, onToggleTheme }) {
     backendChecking,
     backendError,
     retryBackend,
+    source,
+    setDataSource,
+    liveError,
+    reloadLive,
   } = useSimulation()
-  const [selectedId, setSelectedId] = useState(patientQueue[0]?.patient_id)
+  const navigate = useNavigate()
   const [threshold, setThreshold] = useState(75)
   const [metrics, setMetrics] = useState(null)
   const [metricsError, setMetricsError] = useState(false)
@@ -258,6 +156,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
 
   const byId = useMemo(() => new Map(patientQueue.map((p) => [p.patient_id, p])), [patientQueue])
   const ranked = order.map((id) => byId.get(id)).filter(Boolean)
+  const live = source === 'live'
 
   // FLIP: record tile positions before React commits a new order...
   const gridRef = useRef(null)
@@ -282,7 +181,6 @@ export default function Dashboard({ theme, onToggleTheme }) {
     return () => anim.kill()
   }, [orderKey])
 
-  const selected = byId.get(selectedId) || ranked[0]
   const needReview = patientQueue.filter((p) => p.risk >= threshold).length
   const alerts = useMemo(() => buildAlerts(patientQueue), [patientQueue])
   const modelPerf = useMemo(
@@ -328,32 +226,63 @@ export default function Dashboard({ theme, onToggleTheme }) {
           <div>
             <h1>Central station</h1>
             <p className="muted small">
-              Synthetic patients. Scores on this screen are simulated in your browser; every reading is also sent
-              to the backend model.
+              {live
+                ? 'Shared backend simulation — every visitor sees these same beds, scored by the deployed model.'
+                : 'Synthetic patients. Scores on this screen are simulated in your browser; every reading is also sent to the backend model.'}
             </p>
           </div>
           <div className="station-controls">
-            <div className="segmented" role="group" aria-label="Scenario">
-              {scenarioEntries.map(([key, s]) => (
-                <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-            <div className="station-actions">
-              <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
-                {isPaused ? 'Start stream' : 'Pause stream'}
+            <div className="segmented" role="group" aria-label="Data source">
+              <button type="button" aria-pressed={!live} onClick={() => live && setDataSource('simulated')}>
+                Simulated
               </button>
-              <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
-                Reset beds
+              <button type="button" aria-pressed={live} onClick={() => !live && setDataSource('live')}>
+                Backend live
               </button>
             </div>
-            <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
-              <span className="live-dot" aria-hidden="true" />
-              {isPaused ? 'Stream paused' : 'Streaming to backend'}
-            </span>
+            {live ? (
+              <span className="live-status station-live is-live" aria-live="polite">
+                <span className="live-dot" aria-hidden="true" />
+                Backend live · shared beds
+              </span>
+            ) : (
+              <>
+                <div className="segmented" role="group" aria-label="Scenario">
+                  {scenarioEntries.map(([key, s]) => (
+                    <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="station-actions">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
+                    {isPaused ? 'Start stream' : 'Pause stream'}
+                  </button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
+                    Reset beds
+                  </button>
+                </div>
+                <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
+                  <span className="live-dot" aria-hidden="true" />
+                  {isPaused ? 'Stream paused' : 'Streaming to backend'}
+                </span>
+              </>
+            )}
           </div>
         </header>
+
+        {live && ranked.length === 0 && (
+          <div className="page">
+            <p className="notice notice-error" role="alert">
+              Backend live beds are unavailable{liveError && liveError !== 'empty' ? `: ${liveError}` : ''}.
+            </p>
+            <div className="page-actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={reloadLive}>
+                Retry
+              </button>
+            </div>
+          </div>
+        )}
 
         <dl className="station-summary" aria-label="Unit summary">
           <div className={needReview ? 'is-alarm' : ''}>
@@ -389,7 +318,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <h2 id="beds-title" className="sr-only">Beds ranked by risk</h2>
             <ol className="beds" ref={gridRef}>
               {ranked.map((p) => (
-                <BedTile key={p.patient_id} patient={p} selected={p.patient_id === selected?.patient_id} onSelect={setSelectedId} threshold={threshold} />
+                <BedTile key={p.patient_id} patient={p} selected={false} onSelect={(id) => navigate(`/bed/${id}`)} threshold={threshold} />
               ))}
             </ol>
           </section>
@@ -418,46 +347,10 @@ export default function Dashboard({ theme, onToggleTheme }) {
                       </li>
                     ))}
                   </ul>
-                  <p className="muted small">Demo with simulated patients — not for clinical use.</p>
+                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : 'Demo with simulated patients — not for clinical use.'}</p>
                 </>
               )}
             </section>
-
-            {selected && (
-              <section className={`rail-block detail tone-${riskTone(selected.risk)}`} aria-labelledby="detail-title">
-                <div className="rail-head">
-                  <h2 id="detail-title">
-                    {selected.bed}
-                    <span className="muted"> patient {selected.patient_id}</span>
-                  </h2>
-                  <RiskRing value={selected.risk} size={64} />
-                </div>
-                <div className="detail-readouts">
-                  <Readout big label="HR" value={selected.vitals.HR} unit="bpm" color="var(--hr)" />
-                  <Readout big label="SpO2" value={selected.vitals.SpO2} unit="%" color="var(--spo2)" />
-                  <Readout big label="RR" value={selected.vitals.Resp} unit="/min" color="var(--rr)" />
-                  <Readout big label="Temp" value={selected.vitals.Temp.toFixed(1)} unit="°C" color="var(--temp)" />
-                </div>
-                <svg className="detail-trend" viewBox="0 0 320 90" preserveAspectRatio="none" role="img" aria-label={`Risk trend for ${selected.bed}`}>
-                  <line x1="0" x2="320" y1={90 - (threshold / 100) * 90} y2={90 - (threshold / 100) * 90} className="detail-threshold" vectorEffect="non-scaling-stroke" />
-                  <path d={seriesPath(selected.waveform, 320, 90, 4, [0, 100])} vectorEffect="non-scaling-stroke" />
-                </svg>
-                <p className="small muted">Dashed line: your alert threshold ({threshold}). NEWS2 for this bed: <strong className="num">{calculateNews2(selected)}</strong>.</p>
-                <h3 className="detail-sub">What pushes this score</h3>
-                <ul className="drivers">
-                  {scoreContributions(selected.vitals).map((m) => (
-                    <li key={m.name}>
-                      <span>{m.name}</span>
-                      <span className={`driver-bar ${m.points >= 0 ? 'up' : 'down'}`}>
-                        <span style={{ '--w': Math.min(1, Math.abs(m.value) / 10) }} />
-                      </span>
-                      <span className="num">{m.points >= 0 ? '+' : ''}{m.points}</span>
-                    </li>
-                  ))}
-                </ul>
-                <p className="small muted">A simplified view of the simulation, not the model’s attention or SHAP values.</p>
-              </section>
-            )}
           </aside>
         </div>
 
@@ -486,7 +379,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 <tr><th scope="row">NEWS2 at 7 or more</th><td className="num">{news2Perf.sensitivity}%</td><td className="num">{news2Perf.specificity}%</td></tr>
               </tbody>
             </table>
-            <p className="small muted">Computed on the simulated beds, so it shows the idea, not real performance.</p>
+            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : 'Computed on the simulated beds, so it shows the idea, not real performance.'}</p>
           </div>
 
           <div className="lower-block">

@@ -23,10 +23,12 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 try:
     from backend.db import init_db, insert_vital, get_latest_vitals, get_top_patients
     from backend.inference import get_engine, FEATURES
+    from backend.simulation import get_sim_engine
     from backend.training import training_manager
 except ImportError:
     from db import init_db, insert_vital, get_latest_vitals, get_top_patients
     from inference import get_engine, FEATURES
+    from simulation import get_sim_engine
     from training import training_manager
 
 app = FastAPI()
@@ -57,6 +59,10 @@ app.add_middleware(
 )
 
 inference_engine = get_engine()
+# Shared scenario engine: every browser sees the same beds. Ticks score real
+# model risk via the inference engine; patient ids are sim-namespaced.
+sim_engine = get_sim_engine()
+sim_engine.scorer = lambda pid, vitals: inference_engine.add_vital(pid, vitals)
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START_TIME = time.time()
 INGEST_COUNT = 0
@@ -424,6 +430,26 @@ def get_patient(patient_id: str):
 def get_scores():
     """Get all live risk scores."""
     return inference_engine.get_all_scores()
+
+
+class SimControl(BaseModel):
+    action: str  # start | pause | reset | set_scenario
+    scenario: Optional[str] = None
+
+
+@app.get("/simulation/state")
+def simulation_state():
+    """Shared scenario state: identical beds for every connected browser."""
+    return sim_engine.snapshot()
+
+
+@app.post("/simulation/control")
+def simulation_control(cmd: SimControl):
+    """Control the shared simulation (open to all visitors by decision)."""
+    try:
+        return sim_engine.control(cmd.action, cmd.scenario)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
 
 
 @app.get("/metrics")

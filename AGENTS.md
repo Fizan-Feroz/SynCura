@@ -100,6 +100,7 @@ PROJ/
 │   │   └── components/
 │   │       ├── AppShell.jsx     # Top bar, nav, theme switch, skip link
 │   │       ├── LandingPage.jsx  # Landing page
+│   │       ├── BedProfile.jsx   # /bed/:id full bed profile (history charts, alert, drivers)
 │   │       ├── film/            # HeroFilm.jsx + scenes.js (scroll-driven GSAP)
 │   │       ├── Dashboard.jsx    # Central station
 │   │       ├── SensorWaveform.jsx # SVG waveform charts
@@ -169,6 +170,8 @@ Patient Vitals --> [Backend /ingest] --> [SQLite DB]
 | GET | `/health` | API status |
 | GET | `/version` | Website version, deployed model, and git commit |
 | GET | `/admin/status` | Uptime, hosting, model, and ingest throughput for the admin panel |
+| GET | `/simulation/state` | Shared scenario beds — identical for every browser |
+| POST | `/simulation/control` | Shared sim control: start, pause, reset, set_scenario (open to all visitors) |
 | POST | `/ingest` | Ingest vital JSON, returns risk score |
 | GET | `/patients` | Top 6 patients by risk score |
 | GET | `/patient/{id}` | Patient details + recent vitals |
@@ -214,6 +217,7 @@ Notes:
 - **Frontend motion**: use `REDUCED` / `MOTION_OK` from `frontend/src/motion/gsap.js` and register animations inside `mm.add(MOTION_OK, ...)`. Never use `transition: all`; animate only explicit properties. A new animation without a reduced-motion path is a bug.
 - **Frontend risk tiers**: the thresholds live in `frontend/src/components/trace.js` (`riskTone`, 45/70/85). Use those helpers; do not re-derive tiers in a component.
 - **Frontend honesty**: keep the simulation banner, research-prototype qualifiers, and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence. The vitals on screen are client-side synthetic data from `simulationContext.jsx`, not a live patient feed. Dynamic simulation views require a reachable backend: when `/health` fails they stop and show a backend-unavailable error instead of synthetic patients.
+- **Shared simulation**: the dashboard source toggle switches between local `Simulated` beds and `Backend live` beds from `/simulation/state` (one server engine, identical for every browser, reseeds on restart). Bed tiles navigate to `/bed/:patientId` profiles.
 - **No new dependencies** without checking existing ones first
 - **Model compatibility**: always update both `train.py` AND `inference.py` when changing features/architecture. The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; both files import it. Saved scalers are rejected at load when their `features` list does not match exactly.
 - **Thread safety**: RiskScoreEngine uses `threading.Lock()` for concurrent access

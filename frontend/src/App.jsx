@@ -11,6 +11,7 @@ const TrainingMonitor = lazy(() => import('./components/TrainingMonitor'))
 const TrainingJobsList = lazy(() => import('./components/TrainingJobsList'))
 const SimulatedDataFeed = lazy(() => import('./components/SimulatedDataFeed'))
 const ArchitecturePage = lazy(() => import('./components/ArchitecturePage'))
+const BedProfile = lazy(() => import('./components/BedProfile'))
 const SensorWaveform = lazy(() => import('./components/SensorWaveform'))
 const AdminPanel = lazy(() => import('./components/AdminPanel'))
 
@@ -69,6 +70,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LandingPage theme={theme} onToggleTheme={toggleTheme} />} />
             <Route path="/dashboard" element={<Dashboard theme={theme} onToggleTheme={toggleTheme} />} />
+            <Route path="/bed/:patientId" element={<BedProfile theme={theme} onToggleTheme={toggleTheme} />} />
             <Route path="/simulated-data" element={shell(<SimulatedDataFeed />, { wide: true })} />
             <Route path="/waveforms" element={shell(<SensorWaveform />, { wide: true })} />
             {TRAINING_ENABLED ? (

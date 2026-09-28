@@ -146,6 +146,7 @@ function seedIcuEnvironment(patients) {
       lead: profile.lead,
       trajectory,
       waveform: [...patient.waveform.slice(0, -1), Math.round(baselineRisk)],
+      history: [{ t: Date.now(), ...patient.vitals, risk: Math.round(baselineRisk) }],
     }
   })
 }
@@ -225,6 +226,11 @@ export function SimulationProvider({ children }) {
   const [backendStatus, setBackendStatus] = useState('checking')
   const [backendError, setBackendError] = useState(null)
   const [backendVersion, setBackendVersion] = useState(null)
+  // Data source: 'simulated' runs the local engine, 'live' mirrors the shared
+  // backend scenario engine so every browser sees identical beds.
+  const [source, setSource] = useState('simulated')
+  const [liveMeta, setLiveMeta] = useState({ scenario: 'baseline', scenarioLabel: 'Baseline Mix', tick: 0, paused: true })
+  const [liveError, setLiveError] = useState(null)
   const lastIngestTime = React.useRef({}) // Track last ingest time per patient
   const checkSeqRef = React.useRef(0)
   const healthControllerRef = React.useRef(null)
@@ -319,13 +325,19 @@ export function SimulationProvider({ children }) {
 
   // Send vitals to backend for alert processing (with cooldown)
   useEffect(() => {
-    if (isPaused || backendStatus !== 'online') return undefined
+    if (isPaused || backendStatus !== 'online' || source !== 'simulated') return undefined
 
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'hidden') return
       const { profile, lead } = SCENARIOS[activeScenario]
       setPatientQueue((current) => {
-        const updated = current.map((patient) => updatePatient(patient, profile, lead))
+        const updated = current.map((patient) => {
+          const next = updatePatient(patient, profile, lead)
+          return {
+            ...next,
+            history: [...(patient.history || []), { t: Date.now(), ...next.vitals, risk: next.risk }].slice(-60),
+          }
+        })
         const now = Date.now()
         const INGEST_COOLDOWN_MS = 10000 // Send vitals max once every 10 seconds per patient
         
@@ -359,31 +371,116 @@ export function SimulationProvider({ children }) {
       setLastUpdated(new Date())
     }, 1000)
     return () => window.clearInterval(intervalId)
-  }, [activeScenario, backendStatus, isPaused])
+  }, [activeScenario, backendStatus, isPaused, source])
+
+  // Backend live mode: mirror the shared scenario engine. Local simulation
+  // stays off while live so the two never fight over patientQueue.
+  const reloadLive = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_URL}/simulation/state`)
+      if (!res.ok) throw new Error(`GET /simulation/state -> ${res.status}`)
+      const data = await res.json()
+      const beds = Array.isArray(data.beds) ? data.beds : []
+      setPatientQueue(beds)
+      setLiveMeta({
+        scenario: data.scenario || 'baseline',
+        scenarioLabel: data.scenario_label || data.scenario || 'Baseline',
+        tick: data.tick ?? 0,
+        paused: data.paused ?? true,
+      })
+      setLiveError(beds.length ? null : 'empty')
+      setLastUpdated(new Date())
+      return true
+    } catch (err) {
+      setLiveError(err?.message || 'Live state unreachable.')
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (source !== 'live' || backendStatus !== 'online') return undefined
+    reloadLive()
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'hidden') reloadLive()
+    }, 5000)
+    return () => window.clearInterval(intervalId)
+  }, [source, backendStatus, reloadLive])
+
+  const controlLive = useCallback(async (action, scenario) => {
+    try {
+      const res = await fetch(`${API_URL}/simulation/control`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scenario ? { action, scenario } : { action }),
+      })
+      if (!res.ok) throw new Error(`POST /simulation/control -> ${res.status}`)
+      const data = await res.json()
+      setPatientQueue(Array.isArray(data.beds) ? data.beds : [])
+      setLiveMeta({
+        scenario: data.scenario || 'baseline',
+        scenarioLabel: data.scenario_label || data.scenario || 'Baseline',
+        tick: data.tick ?? 0,
+        paused: data.paused ?? true,
+      })
+      setLiveError(null)
+      setLastUpdated(new Date())
+    } catch (err) {
+      setLiveError(err?.message || 'Live control unreachable.')
+    }
+  }, [])
+
+  const setDataSource = useCallback((next) => {
+    setSource(next)
+    setLiveError(null)
+    if (next === 'simulated') {
+      setPatientQueue(seedIcuEnvironment(DEFAULT_PATIENTS))
+      setActiveScenario('baseline')
+      setIsPaused(true)
+      setLastUpdated(new Date())
+    }
+  }, [])
 
   const value = useMemo(
-    () => ({
-      activeScenario,
-      activeScenarioLabel: SCENARIOS[activeScenario].label,
-      scenarioEntries: Object.entries(SCENARIOS),
-      patientQueue,
-      lastUpdated,
-      isPaused,
-      backendOnline: backendStatus === 'online',
-      backendChecking: backendStatus === 'checking',
-      backendError,
-      backendVersion,
-      retryBackend,
-      setActiveScenario,
-      toggleSimulation: () => setIsPaused((current) => !current),
-      resetSimulation: () => {
-        setPatientQueue(seedIcuEnvironment(DEFAULT_PATIENTS))
-        setActiveScenario('baseline')
-        setIsPaused(true)
-        setLastUpdated(new Date())
-      },
-    }),
-    [activeScenario, backendError, backendStatus, backendVersion, retryBackend, patientQueue, lastUpdated, isPaused]
+    () => {
+      const live = source === 'live'
+      return {
+        activeScenario: live ? liveMeta.scenario : activeScenario,
+        activeScenarioLabel: live ? liveMeta.scenarioLabel : SCENARIOS[activeScenario].label,
+        scenarioEntries: Object.entries(SCENARIOS),
+        patientQueue,
+        lastUpdated,
+        isPaused: live ? liveMeta.paused : isPaused,
+        backendOnline: backendStatus === 'online',
+        backendChecking: backendStatus === 'checking',
+        backendError,
+        backendVersion,
+        retryBackend,
+      source,
+      setDataSource,
+      liveError,
+      liveMeta,
+      reloadLive,
+        setActiveScenario: (key) => {
+          if (live) controlLive('set_scenario', key)
+          else setActiveScenario(key)
+        },
+        toggleSimulation: () => {
+          if (live) controlLive(liveMeta.paused ? 'start' : 'pause')
+          else setIsPaused((current) => !current)
+        },
+        resetSimulation: () => {
+          if (live) {
+            controlLive('reset')
+            return
+          }
+          setPatientQueue(seedIcuEnvironment(DEFAULT_PATIENTS))
+          setActiveScenario('baseline')
+          setIsPaused(true)
+          setLastUpdated(new Date())
+        },
+      }
+    },
+    [activeScenario, backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, isPaused, reloadLive, retryBackend, source]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>
