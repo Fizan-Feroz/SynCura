@@ -48,13 +48,16 @@ function topClinicalPattern(vitals, count = 2) {
 }
 
 function buildAlerts(patients) {
+  // One alert per bed: the highest-severity active condition wins. When a bed
+  // escalates (e.g. warning -> critical), the new alert replaces the old one
+  // instead of stacking, so the list never shows stale repeats.
   const alerts = []
   patients.forEach((p) => {
+    const base = { key: `${p.patient_id}-alert`, bed: p.bed }
     if (p.risk >= 90) {
       alerts.push({
-        key: `${p.patient_id}-risk`,
+        ...base,
         level: 'critical',
-        bed: p.bed,
         title: 'Very high risk',
         condition: `Pattern: ${topClinicalPattern(p.vitals).toLowerCase()}`,
         signal: `Risk ${p.risk}% (alerts at 90%).`,
@@ -63,33 +66,38 @@ function buildAlerts(patients) {
       })
       return
     }
-    if (p.vitals.SpO2 <= 88) alerts.push({
-      key: `${p.patient_id}-spo2`,
-      level: 'warning',
-      bed: p.bed,
-      title: 'Hypoxemia',
-      signal: `Low oxygen: SpO2 ${p.vitals.SpO2}% — alert level is 88% or below.`,
-      cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
-      action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
-    })
-    if (p.vitals.Resp >= 30) alerts.push({
-      key: `${p.patient_id}-rr`,
-      level: 'warning',
-      bed: p.bed,
-      title: 'Tachypnea',
-      signal: `Fast breathing: ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
-      cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
-      action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
-    })
-    if (p.vitals.Temp >= 39) alerts.push({
-      key: `${p.patient_id}-temp`,
-      level: 'info',
-      bed: p.bed,
-      title: 'Fever',
-      signal: `High temperature: ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
-      cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
-      action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
-    })
+    if (p.vitals.SpO2 <= 88) {
+      alerts.push({
+        ...base,
+        level: 'warning',
+        title: 'Hypoxemia',
+        signal: `Low oxygen: SpO2 ${p.vitals.SpO2}% — alert level is 88% or below.`,
+        cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
+        action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
+      })
+      return
+    }
+    if (p.vitals.Resp >= 30) {
+      alerts.push({
+        ...base,
+        level: 'warning',
+        title: 'Tachypnea',
+        signal: `Fast breathing: ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
+        cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
+        action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
+      })
+      return
+    }
+    if (p.vitals.Temp >= 39) {
+      alerts.push({
+        ...base,
+        level: 'info',
+        title: 'Fever',
+        signal: `High temperature: ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
+        cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
+        action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
+      })
+    }
   })
   return alerts.slice(0, 6)
 }
