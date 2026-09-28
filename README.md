@@ -22,7 +22,7 @@
 
 ## Release
 
-- Website: **v1.5.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
+- Website: **v1.5.1**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
 - Deployed model: `syncura-attention-lstm-ensemble-v1`, per `ml/deployed_manifest.json`.
 - Deployment check: `GET /version` reports the backend’s website version, model, and git commit.
 - Training UI is internal-only: public builds hide it unless built with `VITE_ENABLE_TRAINING=true`.

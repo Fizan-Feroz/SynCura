@@ -125,6 +125,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
     source,
     setDataSource,
     liveError,
+    liveMeta,
     reloadLive,
     reloadReplay,
   } = useSimulation()
@@ -248,10 +249,27 @@ export default function Dashboard({ theme, onToggleTheme }) {
               </button>
             </div>
             {live ? (
-              <span className="live-status station-live is-live" aria-live="polite">
-                <span className="live-dot" aria-hidden="true" />
-                Backend live · shared beds
-              </span>
+              <>
+                <div className="segmented" role="group" aria-label="Scenario">
+                  {scenarioEntries.map(([key, s]) => (
+                    <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="station-actions">
+                  <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
+                    {isPaused ? 'Start stream' : 'Pause stream'}
+                  </button>
+                  <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
+                    Reset beds
+                  </button>
+                </div>
+                <span className="live-status station-live is-live" aria-live="polite">
+                  <span className="live-dot" aria-hidden="true" />
+                  Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}
+                </span>
+              </>
             ) : replay ? (
               <span className="live-status station-live is-live" aria-live="polite">
                 <span className="live-dot" aria-hidden="true" />
