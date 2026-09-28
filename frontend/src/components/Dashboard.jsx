@@ -166,6 +166,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
   const ranked = order.map((id) => byId.get(id)).filter(Boolean)
   const live = source === 'live'
   const replay = source === 'replay'
+  const demo = source === 'demo'
 
   // FLIP: record tile positions before React commits a new order...
   const gridRef = useRef(null)
@@ -207,7 +208,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
 
   const fmt = (v, pct = true) => (v == null ? 'n/a' : pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(3))
 
-  if (!backendOnline) {
+  if (!backendOnline && source !== 'demo') {
     return (
       <AppShell
         theme={theme}
@@ -237,7 +238,9 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <p className="muted small">
               {live
                 ? 'Shared backend simulation — every visitor sees these same beds, scored by the deployed model.'
-                : 'Backend ingests — real retrospective stays and device posts, scored live by the deployed model. Not live patients.'}
+                : replay
+                  ? 'Backend ingests — real retrospective stays and device posts, scored live by the deployed model. Not live patients.'
+                  : 'Local demo — beds run in this browser only. Nothing here is synced or sent anywhere.'}
             </p>
           </div>
           <div className="station-controls">
@@ -247,6 +250,9 @@ export default function Dashboard({ theme, onToggleTheme }) {
               </button>
               <button type="button" aria-pressed={replay} onClick={() => !replay && setDataSource('replay')}>
                 Replay
+              </button>
+              <button type="button" aria-pressed={demo} onClick={() => !demo && setDataSource('demo')}>
+                Demo
               </button>
             </div>
             {live ? (
@@ -295,7 +301,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 </div>
                 <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
                   <span className="live-dot" aria-hidden="true" />
-                  {isPaused ? 'Stream paused' : 'Streaming to backend'}
+                  {isPaused ? 'Demo paused' : 'Demo running · this browser only'}
                 </span>
               </>
             )}
@@ -413,7 +419,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                       </li>
                     ))}
                   </ul>
-                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : 'Backend-ingested retrospective data — demo, not for clinical use.'}</p>
+                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : replay ? 'Backend-ingested retrospective data — demo, not for clinical use.' : 'Local demo beds — not synced, not for clinical use.'}</p>
                 </>
               )}
             </section>
@@ -445,7 +451,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 <tr><th scope="row">NEWS2 at 7 or more</th><td className="num">{news2Perf.sensitivity}%</td><td className="num">{news2Perf.specificity}%</td></tr>
               </tbody>
             </table>
-            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : 'Computed on backend-ingested beds, so it shows the idea, not real performance.'}</p>
+            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : replay ? 'Computed on backend-ingested beds, so it shows the idea, not real performance.' : 'Computed on local demo beds, so it shows the idea, not real performance.'}</p>
           </div>
 
           <div className="lower-block">

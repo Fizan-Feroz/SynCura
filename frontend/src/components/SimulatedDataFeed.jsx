@@ -14,10 +14,11 @@ export default function SimulatedDataFeed() {
     backendChecking,
     backendError,
     retryBackend,
+    source,
   } = useSimulation()
   const fmt = (v, digits = 0) => (Number.isFinite(v) ? (digits ? v.toFixed(digits) : v) : '—')
 
-  if (!backendOnline) {
+  if (!backendOnline && source !== 'demo') {
     return (
       <BackendStatusPanel
         title="Data feed"
@@ -34,7 +35,9 @@ export default function SimulatedDataFeed() {
         <div>
           <h1>Data feed</h1>
           <p className="muted">
-            One row per bed, read back from the backend — shared simulation state or ingested stays, depending on the dashboard source.
+            {source === 'demo'
+              ? 'One row per bed, generated in this browser for the demo. Nothing is synced or sent anywhere.'
+              : 'One row per bed, read back from the backend — shared simulation state or ingested stays, depending on the dashboard source.'}
           </p>
         </div>
         <div className="page-actions">

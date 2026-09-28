@@ -11,7 +11,7 @@ const CHANNELS = {
 const ORDER = ['HR', 'SpO2', 'Resp', 'Temp']
 
 export default function SensorWaveform() {
-  const { patientQueue, backendOnline, backendChecking, backendError, retryBackend } = useSimulation()
+  const { patientQueue, backendOnline, backendChecking, backendError, retryBackend, source } = useSimulation()
   const [shown, setShown] = useState({ HR: true, SpO2: true, Resp: true, Temp: true })
 
   const rows = useMemo(
@@ -29,7 +29,7 @@ export default function SensorWaveform() {
   )
   const channels = ORDER.filter((k) => shown[k])
 
-  if (!backendOnline) {
+  if (!backendOnline && source !== 'demo') {
     return (
       <BackendStatusPanel
         title="Waveforms"

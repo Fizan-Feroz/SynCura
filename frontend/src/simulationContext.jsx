@@ -1,4 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import mimicDemoPatients from './mimicDemoPatients.json'
 import { API_URL } from './api'
 
 export const SCENARIOS = {
@@ -34,6 +35,105 @@ const SimulationContext = createContext(null)
 const BACKEND_CHECK_MS = 15000
 const BACKEND_TIMEOUT_MS = 30000
 const BACKEND_VERSION_TIMEOUT_MS = 8000
+
+// Local demo engine: runs entirely in this browser for demos. Never synced,
+// never posted to the backend. Restored from history when demo mode returned.
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value))
+}
+
+function randomCentered(scale) {
+  return (Math.random() * 2 - 1) * scale
+}
+
+function assignTrajectory() {
+  const roll = Math.random()
+  if (roll < 0.27) return 'severe'
+  if (roll < 0.52) return 'recovery'
+  if (roll < 0.78) return 'stable'
+  return 'volatile'
+}
+
+function trajectoryProfile(trajectory) {
+  switch (trajectory) {
+    case 'severe':
+      return { hr: 7, spo2: -3, resp: 5, temp: 0.4, riskDrift: 7, volatility: 2.6, lead: 'Multi-organ deterioration' }
+    case 'recovery':
+      return { hr: -4, spo2: 2, resp: -3, temp: -0.3, riskDrift: -6, volatility: 1.4, lead: 'Clinical improvement' }
+    case 'volatile':
+      return { hr: 3, spo2: -1, resp: 2, temp: 0.1, riskDrift: 1, volatility: 4.2, lead: 'Unstable oscillations' }
+    case 'stable':
+    default:
+      return { hr: 0, spo2: 0, resp: 0, temp: 0, riskDrift: 0, volatility: 1.2, lead: 'Stable monitoring' }
+  }
+}
+
+function seedDemoBeds() {
+  return (Array.isArray(mimicDemoPatients) ? mimicDemoPatients : []).map((patient) => {
+    const trajectory = assignTrajectory()
+    const profile = trajectoryProfile(trajectory)
+    const risk = Math.round(clamp(
+      trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk,
+      8, 95
+    ))
+    return {
+      ...patient,
+      risk,
+      trend: '+0',
+      lead: profile.lead,
+      trajectory,
+      waveform: [...patient.waveform.slice(0, -1), risk],
+      history: [{ t: Date.now(), ...patient.vitals, risk }],
+    }
+  })
+}
+
+function scoreContributionsDemo(vitals) {
+  return (
+    (vitals.HR - 85) * 0.24 +
+    (92 - vitals.SpO2) * 1.7 +
+    (vitals.Resp - 18) * 0.6 +
+    (vitals.Temp - 37) * 4.5
+  )
+}
+
+function updateDemoBed(patient, scenarioProfile, scenarioLead) {
+  const trajectory = patient.trajectory || 'stable'
+  const traj = trajectoryProfile(trajectory)
+  const randomizer = Math.max(0.8, (scenarioProfile.volatility + traj.volatility) / 2)
+  const combined = {
+    hr: scenarioProfile.hr + traj.hr,
+    spo2: scenarioProfile.spo2 + traj.spo2,
+    resp: scenarioProfile.resp + traj.resp,
+    temp: scenarioProfile.temp + traj.temp,
+    riskDrift: scenarioProfile.riskDrift + traj.riskDrift,
+  }
+  const nextVitals = {
+    HR: Math.round(clamp(patient.vitals.HR + combined.hr * 0.35 + randomCentered(randomizer), 45, 170)),
+    SpO2: Math.round(clamp(patient.vitals.SpO2 + combined.spo2 * 0.25 + randomCentered(randomizer * 0.35), 75, 100)),
+    Resp: Math.round(clamp(patient.vitals.Resp + combined.resp * 0.25 + randomCentered(randomizer * 0.4), 10, 42)),
+    Temp: Number(clamp(patient.vitals.Temp + combined.temp * 0.12 + randomCentered(randomizer * 0.03), 34.5, 41).toFixed(1)),
+  }
+  const nextRisk = Math.round(clamp(
+    patient.risk + combined.riskDrift * 0.35 + scoreContributionsDemo(nextVitals) * 0.05 + randomCentered(randomizer),
+    8, 99
+  ))
+  const riskChange = nextRisk - patient.risk
+  let leadLabel = scenarioLead
+  if (nextRisk >= 85) leadLabel = 'Multi-organ deterioration'
+  else if (nextRisk < 45) leadLabel = 'Baseline recovery'
+  else if (patient.trajectory === 'recovery') leadLabel = traj.lead
+  return {
+    ...patient,
+    risk: nextRisk,
+    trend: `${riskChange >= 0 ? '+' : ''}${riskChange}`,
+    status: statusForRisk(nextRisk),
+    lead: leadLabel,
+    vitals: nextVitals,
+    waveform: [...patient.waveform.slice(1), nextRisk],
+    history: [...(patient.history || []), { t: Date.now(), ...nextVitals, risk: nextRisk }].slice(-60),
+  }
+}
 
 function statusForRisk(risk) {
   if (risk >= 85) return 'Critical'
@@ -91,6 +191,8 @@ export function SimulationProvider({ children }) {
   const [source, setSource] = useState('live')
   const [liveMeta, setLiveMeta] = useState({ scenario: 'baseline', scenarioLabel: 'Baseline Mix', tick: 0, paused: true })
   const [liveError, setLiveError] = useState(null)
+  const [demoScenario, setDemoScenario] = useState('baseline')
+  const [demoPaused, setDemoPaused] = useState(true)
   const checkSeqRef = React.useRef(0)
   const healthControllerRef = React.useRef(null)
   const versionControllerRef = React.useRef(null)
@@ -254,6 +356,23 @@ export function SimulationProvider({ children }) {
     return () => window.clearInterval(intervalId)
   }, [source, backendStatus, reloadReplay])
 
+  // Demo mode: local-only tick. Never touches the backend, never syncs —
+  // for demos when shared state must stay untouched (or backend is down).
+  useEffect(() => {
+    if (source !== 'demo' || demoPaused) return undefined
+    let cancelled = false
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState === 'hidden' || cancelled) return
+      const { profile, lead } = SCENARIOS[demoScenario]
+      setPatientQueue((current) => current.map((patient) => updateDemoBed(patient, profile, lead)))
+      setLastUpdated(new Date())
+    }, 1000)
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+    }
+  }, [source, demoScenario, demoPaused])
+
   const controlLive = useCallback(async (action, scenario) => {
     try {
       const res = await fetch(`${API_URL}/simulation/control`, {
@@ -279,20 +398,27 @@ export function SimulationProvider({ children }) {
   }, [])
 
   const setDataSource = useCallback((next) => {
-    if (next !== 'live' && next !== 'replay') return
+    if (next !== 'live' && next !== 'replay' && next !== 'demo') return
     setSource(next)
     setLiveError(null)
-    setLastUpdated(new Date())
+    if (next === 'demo') {
+      setPatientQueue(seedDemoBeds())
+      setDemoScenario('baseline')
+      setDemoPaused(true)
+      setLastUpdated(new Date())
+    }
   }, [])
 
   const value = useMemo(
-    () => ({
-      activeScenario: liveMeta.scenario,
-      activeScenarioLabel: liveMeta.scenarioLabel,
+    () => {
+      const demo = source === 'demo'
+      return {
+      activeScenario: demo ? demoScenario : liveMeta.scenario,
+      activeScenarioLabel: demo ? SCENARIOS[demoScenario].label : liveMeta.scenarioLabel,
       scenarioEntries: Object.entries(SCENARIOS),
       patientQueue,
       lastUpdated,
-      isPaused: liveMeta.paused,
+      isPaused: demo ? demoPaused : liveMeta.paused,
       backendOnline: backendStatus === 'online',
       backendChecking: backendStatus === 'checking',
       backendError,
@@ -304,11 +430,28 @@ export function SimulationProvider({ children }) {
       liveMeta,
       reloadLive,
       reloadReplay,
-      setActiveScenario: (key) => controlLive('set_scenario', key),
-      toggleSimulation: () => controlLive(liveMeta.paused ? 'start' : 'pause'),
-      resetSimulation: () => controlLive('reset'),
-    }),
-    [backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, reloadLive, reloadReplay, retryBackend, source]
+      setActiveScenario: (key) => {
+        if (demo) {
+          if (SCENARIOS[key]) setDemoScenario(key)
+        } else controlLive('set_scenario', key)
+      },
+      toggleSimulation: () => {
+        if (demo) setDemoPaused((current) => !current)
+        else controlLive(liveMeta.paused ? 'start' : 'pause')
+      },
+      resetSimulation: () => {
+        if (demo) {
+          setPatientQueue(seedDemoBeds())
+          setDemoScenario('baseline')
+          setDemoPaused(true)
+          setLastUpdated(new Date())
+          return
+        }
+        controlLive('reset')
+      },
+      }
+    },
+    [backendError, backendStatus, backendVersion, controlLive, demoPaused, demoScenario, liveError, liveMeta, patientQueue, lastUpdated, reloadLive, reloadReplay, retryBackend, source]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>

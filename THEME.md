@@ -223,9 +223,9 @@ uses `aria-pressed`; live status uses `aria-live="polite"`; table headers use
 
 **Honesty.** The research-prototype qualifier and
 not-HIPAA-ready note stay visible. Do not add metrics, certifications, or
-clinical claims that the backend does not produce. Beds come only from the
-backend — never a local simulation, never live patients. If
-`/health` is unreachable, the dynamic views stop and show a
+clinical claims that the backend does not produce. Beds come from the
+backend — never live patients; the `Demo` source is the explicit local-only
+exception. If `/health` is unreachable, the backend-backed views stop and show a
 backend-unavailable error rather than continuing silently.
 
 ---

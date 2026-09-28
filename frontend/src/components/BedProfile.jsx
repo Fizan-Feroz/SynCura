@@ -87,7 +87,9 @@ export default function BedProfile({ theme, onToggleTheme }) {
             {' · '}
             {source === 'live'
               ? `Shared backend simulation · ${liveMeta.scenarioLabel}${liveMeta.simulated ? ' (simulated overlay)' : ' (model-scored)'}`
-              : 'Backend ingest · retrospective'} · {bed.lead}
+              : source === 'demo'
+                ? 'Local demo · this browser only'
+                : 'Backend ingest · retrospective'} · {bed.lead}
           </p>
         </div>
         <div className="page-actions">
@@ -186,7 +188,9 @@ export default function BedProfile({ theme, onToggleTheme }) {
       <p className="muted small" style={{ marginTop: 'var(--space-5)' }}>
         {source === 'live'
           ? 'Shared backend simulation — demo, not for clinical use.'
-          : 'Backend-ingested retrospective data — demo, not for clinical use.'}
+          : source === 'demo'
+            ? 'Local demo beds — not synced, not for clinical use.'
+            : 'Backend-ingested retrospective data — demo, not for clinical use.'}
       </p>
     </div>
   )
