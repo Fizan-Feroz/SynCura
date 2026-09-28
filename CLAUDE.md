@@ -55,7 +55,7 @@ backend/          FastAPI REST API
 frontend/         React 18 + Vite + plain CSS (no Tailwind; see THEME.md)
   index.html                Carries a pre-paint theme script to avoid a light-mode flash
   src/main.jsx              CSS load order matters: theme/tokens.css first
-  src/App.jsx               Router, lazy routes, theme state (light/dark -> paper/monitor)
+  src/App.jsx               Router, lazy routes, theme state (light/dark -> paper/monitor CSS values)
   src/simulationContext.jsx Client-side simulation engine (synthetic) — NOT wired to backend
   src/theme/tokens.css      All design tokens; only file with hex colour (film.css excepted)
   src/styles/               base, layout, landing, film, station, pages
@@ -150,7 +150,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 
 ## Docs already in the repo (read these for depth, this file is the map)
 
-- `THEME.md` — the frontend design system: paper/monitor modes, tokens, type, motion, load order, and the rules that keep it coherent. Read before touching any CSS or component.
+- `THEME.md` — the frontend design system: the Light/Dark switch and the `paper`/`monitor` CSS values behind it, tokens, type, motion, load order, and the rules that keep it coherent. Read before touching any CSS or component.
 - `DATA.md` — dataset inventory (what lives under `data/`, which is gitignored, and how paths resolve).
 - `docs/DATASET_SCHEMAS.md` — column-level schema for every dataset, the canonical 12-feature table, and the exact proximity-label definition. The dataset's own dictionary is not in this repo.
 - `README.md` — setup/run instructions, feature log of implemented capabilities.
