@@ -21,19 +21,30 @@ function scoreContributions(vitals) {
   ].map((m) => ({ ...m, points: Number((m.value * 0.05).toFixed(2)) }))
 }
 
-const PLAIN_DRIVER_NAMES = {
-  'Heart rate': 'heart rate',
-  'SpO2': 'oxygen',
-  'Respiratory rate': 'breathing',
-  'Temperature': 'temperature',
+function clinicalTermForDriver(name, vitals) {
+  switch (name) {
+    case 'Heart rate':
+      if (vitals.HR >= 100) return 'Tachycardia'
+      if (vitals.HR <= 60) return 'Bradycardia'
+      return 'Abnormal heart rate'
+    case 'SpO2':
+      return 'Hypoxemia'
+    case 'Respiratory rate':
+      return vitals.Resp >= 20 ? 'Tachypnea' : 'Abnormal breathing'
+    case 'Temperature':
+      return vitals.Temp >= 38 ? 'Fever' : 'Abnormal temperature'
+    default:
+      return name
+  }
 }
 
-function topPlainDrivers(vitals, count = 2) {
-  return scoreContributions(vitals)
+function topClinicalPattern(vitals, count = 2) {
+  const terms = scoreContributions(vitals)
     .slice()
     .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
     .slice(0, count)
-    .map((m) => PLAIN_DRIVER_NAMES[m.name] || m.name.toLowerCase())
+    .map((m) => clinicalTermForDriver(m.name, vitals))
+  return [...new Set(terms)].join(' + ')
 }
 
 function buildAlerts(patients) {
@@ -45,7 +56,8 @@ function buildAlerts(patients) {
         level: 'critical',
         bed: p.bed,
         title: 'Very high risk',
-        signal: `Risk ${p.risk}% (alerts at 90%). Main drivers: ${topPlainDrivers(p.vitals).join(', ')}.`,
+        condition: `Pattern: ${topClinicalPattern(p.vitals).toLowerCase()}`,
+        signal: `Risk ${p.risk}% (alerts at 90%).`,
         cause: 'The concerning vitals behind this score are shown above. Sensors can also misread — confirm the probe and repeat key readings before acting on numbers alone.',
         action: 'See the patient now and follow your unit\u2019s escalation protocol.',
       })
@@ -55,8 +67,8 @@ function buildAlerts(patients) {
       key: `${p.patient_id}-spo2`,
       level: 'warning',
       bed: p.bed,
-      title: 'Low oxygen',
-      signal: `Oxygen (SpO2) ${p.vitals.SpO2}% — alert level is 88% or below.`,
+      title: 'Hypoxemia',
+      signal: `Low oxygen: SpO2 ${p.vitals.SpO2}% — alert level is 88% or below.`,
       cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
       action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
     })
@@ -64,8 +76,8 @@ function buildAlerts(patients) {
       key: `${p.patient_id}-rr`,
       level: 'warning',
       bed: p.bed,
-      title: 'Fast breathing',
-      signal: `Breathing ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
+      title: 'Tachypnea',
+      signal: `Fast breathing: ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
       cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
       action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
     })
@@ -74,7 +86,7 @@ function buildAlerts(patients) {
       level: 'info',
       bed: p.bed,
       title: 'Fever',
-      signal: `Temperature ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
+      signal: `High temperature: ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
       cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
       action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
     })
@@ -390,6 +402,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                         <span className="alert-bed">{a.bed}</span>
                         <span className="alert-body">
                           <strong className="alert-title">{a.title}</strong>
+                          {a.condition && <span className="alert-condition">{a.condition}</span>}
                           <span>{a.signal}</span>
                           <span className="alert-cause"><strong>Why:</strong> {a.cause}</span>
                           <span className="alert-action"><strong>Do:</strong> {a.action}</span>

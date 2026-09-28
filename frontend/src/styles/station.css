@@ -392,6 +392,11 @@
   font-weight: 700;
 }
 
+.alert-condition {
+  font-weight: 600;
+  color: var(--brand);
+}
+
 .alert-cause,
 .alert-action {
   font-size: var(--t-xs);
