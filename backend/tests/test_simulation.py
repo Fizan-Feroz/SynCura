@@ -73,20 +73,57 @@ def test_control_transitions():
     engine = make_engine(seed=5)
     assert engine.control('pause')['paused'] is True
     assert engine.control('start')['paused'] is False
-    assert engine.control('set_scenario', 'septic')['scenario'] == 'septic'
+    septic = engine.control('set_scenario', 'septic')
+    assert septic['scenario'] == 'septic'
+    assert septic['simulated'] is True
+    assert septic['scenario_tick'] == 0
     with pytest.raises(ValueError):
         engine.control('set_scenario', 'not-a-scenario')
     with pytest.raises(ValueError):
         engine.control('explode')
     reset = engine.control('reset')
     assert reset['tick'] == 0 and reset['paused'] is True and reset['scenario'] == 'baseline'
+    assert reset['simulated'] is False and reset['scenario_tick'] == 0
+
+
+def test_baseline_has_no_nudge():
+    engine = make_engine(seed=11)
+    snap = engine.step()
+    assert snap['simulated'] is False
+    assert snap['scenario_tick'] == 1
+
+
+def test_septic_nudge_lifts_displayed_risk():
+    base = make_engine(seed=11)
+    sept = make_engine(seed=11)
+    sept.control('set_scenario', 'septic')
+    for _ in range(6):
+        base.step()
+        displayed = sept.step()
+    base_risks = [b['risk'] for b in base.snapshot()['beds']]
+    sept_risks = [b['risk'] for b in displayed['beds']]
+    assert sum(sept_risks) > sum(base_risks), 'septic overlay must visibly lift risk'
+    assert displayed['simulated'] is True
+    assert all(8 <= r <= 99 for r in sept_risks)
+
+
+def test_recovery_nudge_lowers_displayed_risk():
+    base = make_engine(seed=11)
+    rec = make_engine(seed=11)
+    rec.control('set_scenario', 'recovery')
+    for _ in range(6):
+        base.step()
+        displayed = rec.step()
+    base_risks = [b['risk'] for b in base.snapshot()['beds']]
+    rec_risks = [b['risk'] for b in displayed['beds']]
+    assert sum(rec_risks) < sum(base_risks), 'recovery overlay must visibly lower risk'
 
 
 def test_snapshot_schema_matches_frontend_shape():
     engine = make_engine(seed=9)
     snap = engine.step()
     assert snap['source'] == 'backend'
-    for key in ('scenario', 'scenario_label', 'paused', 'tick', 'seed', 'beds'):
+    for key in ('scenario', 'scenario_label', 'simulated', 'scenario_tick', 'paused', 'tick', 'seed', 'beds'):
         assert key in snap
     bed = snap['beds'][0]
     for key in ('patient_id', 'bed', 'status', 'risk', 'trend', 'lead',

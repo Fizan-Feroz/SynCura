@@ -23,6 +23,21 @@ DEFAULT_SEED = 20260928
 HISTORY_LIMIT = 60
 WAVEFORM_LIMIT = 12
 
+# Non-baseline scenarios are simulated what-if overlays: drift runs hotter so
+# the change is visible within a few ticks, and a capped risk nudge is added
+# on top of the model score. Baseline stays pure model output (the "real"
+# view). The snapshot flags simulated=true whenever a nudge is active.
+DRIFT_GAIN = 2.0
+SCENARIO_NUDGE_PER_TICK = {
+    "baseline": 0.0,
+    "respiratory": 1.5,
+    "septic": 2.0,
+    "cardiac": 2.0,
+    "recovery": -2.0,
+}
+NUDGE_CAP = 20
+NUDGE_RAMP_TICKS = 10
+
 # Seed beds — must stay in sync with frontend/src/mimicDemoPatients.json.
 # backend/tests/test_simulation.py asserts parity.
 SEED_PATIENTS = [
@@ -159,6 +174,7 @@ class SimulationEngine:
             self.scenario = "baseline"
             self.paused = True
             self.tick = 0
+            self.scenario_tick = 0
             self.beds = [self._seed_bed(dict(p)) for p in SEED_PATIENTS]
 
     def _seed_bed(self, patient):
@@ -198,6 +214,7 @@ class SimulationEngine:
             raise ValueError(f"Unknown scenario: {scenario}")
         with self.lock:
             self.scenario = scenario
+            self.scenario_tick = 0
 
     def control(self, action, scenario=None):
         if action == "start":
@@ -224,21 +241,26 @@ class SimulationEngine:
             scenario = SCENARIOS[self.scenario]
             profile, scenario_lead = scenario["profile"], scenario["lead"]
             self.tick += 1
+            self.scenario_tick += 1
+            gain = DRIFT_GAIN if self.scenario != "baseline" else 1.0
+            nudge = _clamp(SCENARIO_NUDGE_PER_TICK[self.scenario]
+                           * min(self.scenario_tick, NUDGE_RAMP_TICKS),
+                           -NUDGE_CAP, NUDGE_CAP)
             now = time.time()
             for bed in self.beds:
-                self._update_bed(bed, profile, scenario_lead, now)
+                self._update_bed(bed, profile, scenario_lead, gain, nudge, now)
             return self._snapshot_locked()
 
-    def _update_bed(self, bed, profile, scenario_lead, now):
+    def _update_bed(self, bed, profile, scenario_lead, gain, nudge, now):
         traj = TRAJECTORY_PROFILES.get(bed.get("trajectory") or "stable",
                                        TRAJECTORY_PROFILES["stable"])
         randomizer = max(0.8, (profile["volatility"] + traj["volatility"]) / 2)
         combined = {
-            "hr": profile["hr"] + traj["hr"],
-            "spo2": profile["spo2"] + traj["spo2"],
-            "resp": profile["resp"] + traj["resp"],
-            "temp": profile["temp"] + traj["temp"],
-            "riskDrift": profile["riskDrift"] + traj["riskDrift"],
+            "hr": (profile["hr"] + traj["hr"]) * gain,
+            "spo2": (profile["spo2"] + traj["spo2"]) * gain,
+            "resp": (profile["resp"] + traj["resp"]) * gain,
+            "temp": (profile["temp"] + traj["temp"]) * gain,
+            "riskDrift": (profile["riskDrift"] + traj["riskDrift"]) * gain,
         }
         v = bed["vitals"]
         next_vitals = {
@@ -273,6 +295,9 @@ class SimulationEngine:
                     risk = int(scored)
             except Exception:
                 pass
+        # Simulated what-if overlay: baseline shows the raw score, other
+        # scenarios add the capped nudge so the switch is visible in a tick.
+        risk = _round_half_up(_clamp(risk + nudge, 8, 99))
         change = risk - bed["risk"]
         if risk >= 85:
             lead = "Multi-organ deterioration"
@@ -302,6 +327,8 @@ class SimulationEngine:
             "source": "backend",
             "scenario": self.scenario,
             "scenario_label": scenario["label"],
+            "simulated": self.scenario != "baseline",
+            "scenario_tick": self.scenario_tick,
             "paused": self.paused,
             "tick": self.tick,
             "seed": self.seed,

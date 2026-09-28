@@ -195,6 +195,7 @@ export function SimulationProvider({ children }) {
         scenarioLabel: data.scenario_label || data.scenario || 'Baseline',
         tick: data.tick ?? 0,
         paused: data.paused ?? true,
+        simulated: data.simulated ?? data.scenario !== 'baseline',
       })
       setLiveError(beds.length ? null : 'empty')
       setLastUpdated(new Date())
@@ -268,6 +269,7 @@ export function SimulationProvider({ children }) {
         scenarioLabel: data.scenario_label || data.scenario || 'Baseline',
         tick: data.tick ?? 0,
         paused: data.paused ?? true,
+        simulated: data.simulated ?? data.scenario !== 'baseline',
       })
       setLiveError(null)
       setLastUpdated(new Date())

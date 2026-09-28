@@ -268,7 +268,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 </div>
                 <span className="live-status station-live is-live" aria-live="polite">
                   <span className="live-dot" aria-hidden="true" />
-                  Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}
+                  Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}{liveMeta.simulated ? ' · simulated' : ''}
                 </span>
               </>
             ) : replay ? (

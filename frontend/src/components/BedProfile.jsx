@@ -20,7 +20,7 @@ function fmtVital(value, digits = 0) {
 
 export default function BedProfile({ theme, onToggleTheme }) {
   const { patientId } = useParams()
-  const { patientQueue, backendOnline, source } = useSimulation()
+  const { patientQueue, backendOnline, source, liveMeta } = useSimulation()
   const bed = patientQueue.find((p) => p.patient_id === patientId)
   const [shap, setShap] = useState(null)
 
@@ -85,7 +85,9 @@ export default function BedProfile({ theme, onToggleTheme }) {
           <p className="muted">
             <span className={`status status-${tone}`}>{riskLabel(bed.risk)}</span>
             {' · '}
-            {source === 'live' ? 'Shared backend simulation' : 'Backend ingest · retrospective'} · {bed.lead}
+            {source === 'live'
+              ? `Shared backend simulation · ${liveMeta.scenarioLabel}${liveMeta.simulated ? ' (simulated overlay)' : ' (model-scored)'}`
+              : 'Backend ingest · retrospective'} · {bed.lead}
           </p>
         </div>
         <div className="page-actions">
