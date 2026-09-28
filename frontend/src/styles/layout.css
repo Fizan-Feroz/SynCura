@@ -17,6 +17,13 @@
   color: var(--brand);
 }
 
+.app-version {
+  font-size: var(--t-xs);
+  font-weight: 600;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
 /* ---------- Top bar ---------- */
 .topbar {
   position: sticky;
@@ -192,7 +199,8 @@
 }
 
 @media (max-width: 560px) {
-  .live-status {
+  .live-status,
+  .app-version {
     display: none;
   }
 }

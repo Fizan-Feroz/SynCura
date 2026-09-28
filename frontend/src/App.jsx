@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
+import { TRAINING_ENABLED } from './config'
 import { SimulationProvider } from './simulationContext'
 import AppShell from './components/AppShell'
 
@@ -69,9 +70,19 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard theme={theme} onToggleTheme={toggleTheme} />} />
             <Route path="/simulated-data" element={shell(<SimulatedDataFeed />, { wide: true })} />
             <Route path="/waveforms" element={shell(<SensorWaveform />, { wide: true })} />
-            <Route path="/training" element={shell(<TrainingJobsList />)} />
-            <Route path="/training/new" element={shell(<TrainingConfig />)} />
-            <Route path="/training/:jobId" element={shell(<TrainingMonitor />)} />
+            {TRAINING_ENABLED ? (
+              <>
+                <Route path="/training" element={shell(<TrainingJobsList />)} />
+                <Route path="/training/new" element={shell(<TrainingConfig />)} />
+                <Route path="/training/:jobId" element={shell(<TrainingMonitor />)} />
+              </>
+            ) : (
+              <>
+                <Route path="/training" element={<Navigate to="/" replace />} />
+                <Route path="/training/new" element={<Navigate to="/" replace />} />
+                <Route path="/training/:jobId" element={<Navigate to="/" replace />} />
+              </>
+            )}
             <Route path="/architecture" element={shell(<ArchitecturePage />)} />
           </Routes>
         </Suspense>

@@ -84,6 +84,21 @@ def test_api_health_and_validation():
     assert r.status_code == 422
 
 
+def test_version_endpoint_tracks_website_and_model():
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    client = TestClient(app_module.app)
+    r = client.get('/version')
+    assert r.status_code == 200
+    body = r.json()
+    package = json.load(open(os.path.join(REPO, 'frontend', 'package.json')))
+    manifest = json.load(open(os.path.join(REPO, 'ml', 'deployed_manifest.json')))
+    assert body['service'] == 'syncura-backend'
+    assert body['website_version'] == package['version']
+    assert body['model_id'] == manifest['model_id']
+    assert 'git_commit' in body
+
+
 def test_ingest_roundtrip():
     from fastapi.testclient import TestClient
     import backend.app as app_module

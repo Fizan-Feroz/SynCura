@@ -1,14 +1,16 @@
 import React from 'react'
 import { Link, NavLink } from 'react-router-dom'
+import { APP_VERSION, TRAINING_ENABLED } from '../config'
+import { useSimulation } from '../simulationContext'
 import { BrandMark, Wordmark } from './Brand'
 
 const NAV = [
   { to: '/dashboard', label: 'Central station' },
   { to: '/waveforms', label: 'Waveforms' },
   { to: '/simulated-data', label: 'Data feed' },
-  { to: '/training', label: 'Training' },
+  { to: '/training', label: 'Training', internal: true },
   { to: '/architecture', label: 'Architecture' },
-]
+].filter((item) => TRAINING_ENABLED || !item.internal)
 
 export function ThemeSwitch({ theme, onToggleTheme }) {
   const [side, setSide] = React.useState(theme)
@@ -42,6 +44,13 @@ export function ThemeSwitch({ theme, onToggleTheme }) {
 }
 
 export function TopBar({ theme, onToggleTheme, landing = false, status }) {
+  const { backendVersion } = useSimulation()
+  const versionLabel =
+    backendVersion && backendVersion !== APP_VERSION
+      ? `Website version ${APP_VERSION}, backend reports ${backendVersion}`
+      : `Website version ${APP_VERSION}`
+  const versionText =
+    backendVersion && backendVersion !== APP_VERSION ? `v${APP_VERSION} • API v${backendVersion}` : `v${APP_VERSION}`
   return (
     <header className={`topbar ${landing ? 'topbar-landing' : ''}`}>
       <Link to="/" className="topbar-brand" aria-label="SynCura home">
@@ -63,6 +72,9 @@ export function TopBar({ theme, onToggleTheme, landing = false, status }) {
       </nav>
 
       <div className="topbar-end">
+        <span className="app-version num" aria-label={versionLabel}>
+          {versionText}
+        </span>
         {status && (
           <span className={`live-status ${status.live ? 'is-live' : ''}`} aria-live="polite">
             <span className="live-dot" aria-hidden="true" />

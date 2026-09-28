@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { gsap, useGSAP, ScrollTrigger, MOTION_OK } from '../motion/gsap'
+import { APP_VERSION, TRAINING_ENABLED } from '../config'
 import { TopBar } from './AppShell'
 import { BrandMark, Wordmark } from './Brand'
 import HeroFilm from './film/HeroFilm'
@@ -36,9 +37,11 @@ const DESTINATIONS = [
   { to: '/dashboard', name: 'Central station', body: 'Twelve synthetic beds ranked by risk, with scenarios, alert threshold tuning and a NEWS2 comparison.' },
   { to: '/waveforms', name: 'Waveforms', body: 'Per-bed trends for heart rate, SpO2, respiration and temperature, drawn like monitor channels.' },
   { to: '/simulated-data', name: 'Data feed', body: 'The raw stream the dashboard sends to the backend, one row per bed.' },
-  { to: '/training', name: 'Training', body: 'Start a training job against your PhysioNet files and watch loss and AUC as it runs.' },
+  { to: '/training', name: 'Training', body: 'Start a training job against your PhysioNet files and watch loss and AUC as it runs.', internal: true },
   { to: '/architecture', name: 'Architecture', body: 'The pipeline from sensor to score, the stack, and the limits of this prototype.' },
 ]
+
+const PUBLIC_DESTINATIONS = DESTINATIONS.filter((d) => TRAINING_ENABLED || !d.internal)
 
 export default function LandingPage({ theme, onToggleTheme }) {
   const root = useRef(null)
@@ -143,7 +146,7 @@ export default function LandingPage({ theme, onToggleTheme }) {
             <p className="muted">Every screen runs on synthetic patients, so you can try it without clinical data.</p>
           </div>
           <ul className="destinations">
-            {DESTINATIONS.map((d) => (
+            {PUBLIC_DESTINATIONS.map((d) => (
               <li key={d.to}>
                 <Link to={d.to} className="destination">
                   <span className="destination-name">{d.name}</span>
@@ -165,6 +168,8 @@ export default function LandingPage({ theme, onToggleTheme }) {
         </div>
         <p className="small muted">
           Research prototype built on the PhysioNet 2012 challenge dataset. Not for clinical use.
+          <br />
+          <span className="num">Website version v{APP_VERSION}</span>
         </p>
       </footer>
     </div>

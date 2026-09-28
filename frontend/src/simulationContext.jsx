@@ -223,6 +223,7 @@ export function SimulationProvider({ children }) {
   const [isPaused, setIsPaused] = useState(true)
   const [backendStatus, setBackendStatus] = useState('checking')
   const [backendError, setBackendError] = useState(null)
+  const [backendVersion, setBackendVersion] = useState(null)
   const lastIngestTime = React.useRef({}) // Track last ingest time per patient
 
   const checkBackend = useCallback(async () => {
@@ -232,11 +233,25 @@ export function SimulationProvider({ children }) {
       const response = await fetch(`${API_URL}/health`, { signal: controller.signal })
       if (!response.ok) throw new Error(`GET /health -> ${response.status}`)
       await response.json().catch(() => ({}))
+      let deployedWebsiteVersion = null
+      try {
+        const versionResponse = await fetch(`${API_URL}/version`, { signal: controller.signal })
+        if (versionResponse.ok) {
+          const versionData = await versionResponse.json().catch(() => ({}))
+          if (typeof versionData?.website_version === 'string') {
+            deployedWebsiteVersion = versionData.website_version
+          }
+        }
+      } catch {
+        // Health is sufficient for online status; version tracking is best-effort.
+      }
       setBackendStatus('online')
       setBackendError(null)
+      setBackendVersion(deployedWebsiteVersion)
       return true
     } catch (error) {
       setBackendStatus('offline')
+      setBackendVersion(null)
       setBackendError(
         error?.name === 'AbortError'
           ? 'The backend did not respond within 10 seconds.'
@@ -320,6 +335,7 @@ export function SimulationProvider({ children }) {
       backendOnline: backendStatus === 'online',
       backendChecking: backendStatus === 'checking',
       backendError,
+      backendVersion,
       retryBackend: checkBackend,
       setActiveScenario,
       toggleSimulation: () => setIsPaused((current) => !current),
@@ -330,7 +346,7 @@ export function SimulationProvider({ children }) {
         setLastUpdated(new Date())
       },
     }),
-    [activeScenario, backendError, backendStatus, checkBackend, patientQueue, lastUpdated, isPaused]
+    [activeScenario, backendError, backendStatus, backendVersion, checkBackend, patientQueue, lastUpdated, isPaused]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>

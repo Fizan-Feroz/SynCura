@@ -55,6 +55,7 @@ app.add_middleware(
 )
 
 inference_engine = get_engine()
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "120"))
 # Minimum risk required to send risk-based Discord alerts (0-100)
 MIN_DISCORD_RISK = int(os.getenv("MIN_DISCORD_RISK", "90"))
@@ -65,6 +66,28 @@ _alert_lock = threading.Lock()
 
 # Key used when applying a per-patient cooldown (aggregate alerts)
 _PATIENT_COOLDOWN_KEY = "__patient_alert__"
+
+
+def _read_json_file(path):
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def website_version():
+    package = _read_json_file(os.path.join(REPO_ROOT, "frontend", "package.json"))
+    version = package.get("version")
+    return version if isinstance(version, str) and version else "unknown"
+
+
+def deployed_model_info():
+    manifest = _read_json_file(os.path.join(REPO_ROOT, "ml", "deployed_manifest.json"))
+    return {
+        "model_id": manifest.get("model_id", "unknown"),
+        "val_auc": manifest.get("val_auc"),
+    }
 
 
 def send_discord_alert(message: str):
@@ -210,6 +233,19 @@ def health():
         "ensemble_members": len(inference_engine.models),
         "degraded": inference_engine.degraded,
         "load_error": inference_engine.load_error,
+    }
+
+
+@app.get("/version")
+def version():
+    """Version-tracking endpoint for website and deployment checks."""
+    model = deployed_model_info()
+    return {
+        "service": "syncura-backend",
+        "website_version": website_version(),
+        "model_id": model["model_id"],
+        "model_val_auc": model["val_auc"],
+        "git_commit": os.getenv("RENDER_GIT_COMMIT", "unknown"),
     }
 
 

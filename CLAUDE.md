@@ -56,6 +56,7 @@ frontend/         React 18 + Vite + plain CSS (no Tailwind; see THEME.md)
   index.html                Carries a pre-paint theme script to avoid a light-mode flash
   src/main.jsx              CSS load order matters: theme/tokens.css first
   src/App.jsx               Router, lazy routes, theme state (light/dark -> paper/monitor CSS values)
+  src/config.js             Website version; VITE_ENABLE_TRAINING gate for internal training routes
   src/simulationContext.jsx Client-side synthetic engine; dashboard, waveforms, and data feed require /health and show backend-unavailable otherwise
   src/theme/tokens.css      All design tokens; only file with hex colour (film.css excepted)
   src/styles/               base, layout, landing, film, station, pages
@@ -67,7 +68,7 @@ frontend/         React 18 + Vite + plain CSS (no Tailwind; see THEME.md)
     Dashboard.jsx         Central station
     SensorWaveform.jsx    SVG waveform + explainability overlay
     trace.js              ecgPath, seriesPath, riskTone thresholds (45/70/85)
-    TrainingConfig.jsx / TrainingMonitor.jsx / TrainingJobsList.jsx   Training job UI
+    TrainingConfig.jsx / TrainingMonitor.jsx / TrainingJobsList.jsx   Internal training job UI; hidden unless built with VITE_ENABLE_TRAINING=true
     SimulatedDataFeed.jsx Tabular live-data view
     ArchitecturePage.jsx  In-app architecture docs
 
@@ -122,6 +123,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/health` | status |
+| GET | `/version` | website version, deployed model, and git commit |
 | POST | `/ingest` | vital JSON in, `{patient_id, risk_score, stored}` out |
 | GET | `/patients` | top 6 by risk |
 | GET | `/patient/{id}` | details + recent vitals |
@@ -134,6 +136,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 
 - **Python**: match existing style, no comments unless the logic is genuinely non-obvious.
 - **JS/JSX**: functional components + hooks, styled with the plain CSS in `frontend/src/styles/`. No Tailwind, no CSS-in-JS. Full design system in `THEME.md`.
+- Bump `frontend/package.json` for website releases. The flag is build-time only: public builds must not set `VITE_ENABLE_TRAINING=true`.
 - Colour, type, space, radius, and motion all come from `frontend/src/theme/tokens.css`. Never hardcode hex outside that file and `src/styles/film.css` (the hero film is deliberately its own dark stage in both modes).
 - One typeface (Archivo Variable). Change hierarchy with the width axis (`--wide`/`--normal`/`--narrow`), not by adding a family.
 - Animations must register inside `mm.add(MOTION_OK, ...)` using `REDUCED`/`MOTION_OK` from `src/motion/gsap.js`. Never `transition: all`.

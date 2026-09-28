@@ -93,6 +93,7 @@ PROJ/
 │   │   ├── main.jsx             # Entrypoint; CSS load order matters, tokens.css first
 │   │   ├── simulationContext.jsx # Client-side synthetic engine; dynamic views require /health and show backend-unavailable otherwise
 │   │   ├── api.js               # Backend HTTP client
+│   │   ├── config.js            # Website version from package.json; VITE_ENABLE_TRAINING gate
 │   │   ├── theme/tokens.css     # ALL design tokens; only place with hex colour (film.css excepted)
 │   │   ├── styles/              # base, layout, landing, film, station, pages
 │   │   ├── motion/gsap.js       # GSAP plugins + REDUCED / MOTION_OK media queries
@@ -166,6 +167,7 @@ Patient Vitals --> [Backend /ingest] --> [SQLite DB]
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | API status |
+| GET | `/version` | Website version, deployed model, and git commit |
 | POST | `/ingest` | Ingest vital JSON, returns risk score |
 | GET | `/patients` | Top 6 patients by risk score |
 | GET | `/patient/{id}` | Patient details + recent vitals |
@@ -204,6 +206,8 @@ Notes:
 
 - **Python**: Follow existing style, no comments unless complex logic
 - **JavaScript/JSX**: React functional components with hooks, styled with the plain CSS in `frontend/src/styles/` using BEM-ish class names. There is no Tailwind and no CSS-in-JS. Full design system: `THEME.md`.
+- **Website releases**: bump `frontend/package.json` `version`; the top bar and landing footer display it, while `/version` reports the deployed backend’s website version, model, and git commit.
+- **Training UI visibility**: training routes/nav are internal-only and require a `VITE_ENABLE_TRAINING=true` build. Do not expose them in public builds. This hides the UI; it is not authentication for the backend training endpoints.
 - **Frontend theme**: `frontend/src/theme/tokens.css` is the single source of colour, type, space, radius, and motion. The switch is labelled **Light**/**Dark**; the underlying CSS values are `paper` and `monitor`. Do not hardcode hex outside `tokens.css` and `styles/film.css` (the hero film is deliberately its own dark stage), and do not introduce page-local colour systems.
 - **Frontend type**: one family (Archivo Variable, self-hosted). Change hierarchy with the width axis (`--wide` / `--normal` / `--narrow`), never by adding a second typeface.
 - **Frontend motion**: use `REDUCED` / `MOTION_OK` from `frontend/src/motion/gsap.js` and register animations inside `mm.add(MOTION_OK, ...)`. Never use `transition: all`; animate only explicit properties. A new animation without a reduced-motion path is a bug.
