@@ -45,7 +45,7 @@ export default function SensorWaveform() {
       <header className="page-head">
         <div>
           <h1>Waveforms</h1>
-          <p className="muted">Recent trends for every bed, drawn like monitor channels. Synthetic data.</p>
+          <p className="muted">Recent trends for every bed, drawn like monitor channels. Backend data.</p>
         </div>
         <div className="channel-toggles" role="group" aria-label="Channels">
           {ORDER.map((k) => (

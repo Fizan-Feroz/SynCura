@@ -34,7 +34,7 @@ export default function SimulatedDataFeed() {
         <div>
           <h1>Data feed</h1>
           <p className="muted">
-            The readings the dashboard generates and sends to <code>/ingest</code>, one row per bed.
+            One row per bed, read back from the backend — shared simulation state or ingested stays, depending on the dashboard source.
           </p>
         </div>
         <div className="page-actions">
@@ -53,7 +53,7 @@ export default function SimulatedDataFeed() {
         <div><dt>Last update</dt><dd className="num">{lastUpdated.toLocaleTimeString()}</dd></div>
       </dl>
 
-      <div className="table-wrap" tabIndex="0" aria-label="Simulated patient stream, scrollable">
+      <div className="table-wrap" tabIndex="0" aria-label="Backend bed stream, scrollable">
         <table className="feed-table">
           <thead>
             <tr>

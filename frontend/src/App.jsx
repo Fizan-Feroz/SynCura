@@ -71,7 +71,7 @@ export default function App() {
             <Route path="/" element={<LandingPage theme={theme} onToggleTheme={toggleTheme} />} />
             <Route path="/dashboard" element={<Dashboard theme={theme} onToggleTheme={toggleTheme} />} />
             <Route path="/bed/:patientId" element={<BedProfile theme={theme} onToggleTheme={toggleTheme} />} />
-            <Route path="/simulated-data" element={shell(<SimulatedDataFeed />, { wide: true })} />
+            <Route path="/data-feed" element={shell(<SimulatedDataFeed />, { wide: true })} />
             <Route path="/waveforms" element={shell(<SensorWaveform />, { wide: true })} />
             {TRAINING_ENABLED ? (
               <>

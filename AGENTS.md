@@ -91,7 +91,7 @@ PROJ/
 │   ├── src/
 │   │   ├── App.jsx              # Router, lazy routes, theme state (light/dark -> paper/monitor CSS values)
 │   │   ├── main.jsx             # Entrypoint; CSS load order matters, tokens.css first
-│   │   ├── simulationContext.jsx # Client-side synthetic engine; dynamic views require /health and show backend-unavailable otherwise
+│   │   ├── simulationContext.jsx # Backend health, data-source state, live/replay polling
 │   │   ├── api.js               # Backend HTTP client
 │   │   ├── config.js            # Website version from package.json; VITE_ENABLE_TRAINING gate
 │   │   ├── theme/tokens.css     # ALL design tokens; only place with hex colour (film.css excepted)
@@ -216,8 +216,8 @@ Notes:
 - **Frontend type**: one family (Archivo Variable, self-hosted). Change hierarchy with the width axis (`--wide` / `--normal` / `--narrow`), never by adding a second typeface.
 - **Frontend motion**: use `REDUCED` / `MOTION_OK` from `frontend/src/motion/gsap.js` and register animations inside `mm.add(MOTION_OK, ...)`. Never use `transition: all`; animate only explicit properties. A new animation without a reduced-motion path is a bug.
 - **Frontend risk tiers**: the thresholds live in `frontend/src/components/trace.js` (`riskTone`, 45/70/85). Use those helpers; do not re-derive tiers in a component.
-- **Frontend honesty**: keep the simulation banner, research-prototype qualifiers, and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence. The vitals on screen are client-side synthetic data from `simulationContext.jsx`, not a live patient feed. Dynamic simulation views require a reachable backend: when `/health` fails they stop and show a backend-unavailable error instead of synthetic patients.
-- **Shared simulation**: the dashboard source toggle switches between local `Simulated` beds, `Backend live` beds from `/simulation/state` (one server engine, identical for every browser, reseeds on restart), and `Replay` beds read back from `/patients` + `/patient/{id}` (PhysioNet replay via `backend/replay.py`, devices, or simulation posts). Bed tiles navigate to `/bed/:patientId` profiles.
+- **Frontend honesty**: keep the research-prototype qualifiers and not-HIPAA-ready note visible. Do not invent metrics, certifications, clinical claims, or prospective evidence. All beds come from the backend (`Backend live` scenario engine or `Replay` ingests) — there is no local simulation and no live-patient feed. Dynamic views require a reachable backend: when `/health` fails they stop and show a backend-unavailable error instead of stale beds.
+- **Shared simulation**: the dashboard source toggle switches between `Backend live` beds from `/simulation/state` (one server engine, identical for every browser, reseeds on restart) and `Replay` beds read back from `/patients` + `/patient/{id}` (PhysioNet replay via `backend/replay.py`, devices, or simulation posts). Bed tiles navigate to `/bed/:patientId` profiles. No per-browser simulation exists.
 - **No new dependencies** without checking existing ones first
 - **Model compatibility**: always update both `train.py` AND `inference.py` when changing features/architecture. The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; both files import it. Saved scalers are rejected at load when their `features` list does not match exactly.
 - **Thread safety**: RiskScoreEngine uses `threading.Lock()` for concurrent access

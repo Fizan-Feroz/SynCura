@@ -1,53 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import mimicDemoPatients from './mimicDemoPatients.json'
 import { API_URL } from './api'
-
-export const BASE_PATIENTS = [
-  {
-    patient_id: '132547',
-    bed: 'ICU-04',
-    status: 'High',
-    risk: 76,
-    trend: '+2',
-    lead: 'Mixed instability',
-    vitals: { HR: 112, SpO2: 91, Resp: 27, Temp: 38.0 },
-    waveform: [56, 60, 58, 61, 64, 62, 66, 69, 68, 71, 74, 76],
-  },
-  {
-    patient_id: '132611',
-    bed: 'ICU-09',
-    status: 'Watch',
-    risk: 63,
-    trend: '+1',
-    lead: 'Hemodynamic watch',
-    vitals: { HR: 96, SpO2: 94, Resp: 22, Temp: 37.6 },
-    waveform: [44, 47, 45, 49, 52, 50, 53, 57, 58, 60, 61, 63],
-  },
-  {
-    patient_id: '132590',
-    bed: 'ICU-12',
-    status: 'Watch',
-    risk: 52,
-    trend: '+0',
-    lead: 'Early inflammatory signal',
-    vitals: { HR: 90, SpO2: 95, Resp: 21, Temp: 37.5 },
-    waveform: [36, 38, 39, 37, 41, 40, 43, 44, 45, 48, 49, 52],
-  },
-  {
-    patient_id: '132539',
-    bed: 'ICU-02',
-    status: 'Stable',
-    risk: 31,
-    trend: '-1',
-    lead: 'Baseline recovery',
-    vitals: { HR: 75, SpO2: 97, Resp: 18, Temp: 36.7 },
-    waveform: [38, 37, 35, 36, 33, 34, 32, 31, 30, 32, 30, 31],
-  },
-]
-
-const DEFAULT_PATIENTS = Array.isArray(mimicDemoPatients) && mimicDemoPatients.length >= 12
-  ? mimicDemoPatients.slice(0, 12)
-  : BASE_PATIENTS
 
 export const SCENARIOS = {
   baseline: {
@@ -82,83 +34,6 @@ const SimulationContext = createContext(null)
 const BACKEND_CHECK_MS = 15000
 const BACKEND_TIMEOUT_MS = 30000
 const BACKEND_VERSION_TIMEOUT_MS = 8000
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value))
-}
-
-function randomCentered(scale) {
-  return (Math.random() * 2 - 1) * scale
-}
-
-function randomPick(items) {
-  return items[Math.floor(Math.random() * items.length)]
-}
-
-function assignTrajectory() {
-  const roll = Math.random()
-  if (roll < 0.27) return 'severe'
-  if (roll < 0.52) return 'recovery'
-  if (roll < 0.78) return 'stable'
-  return 'volatile'
-}
-
-function trajectoryProfile(trajectory) {
-  switch (trajectory) {
-    case 'severe':
-      return { hr: 7, spo2: -3, resp: 5, temp: 0.4, riskDrift: 7, volatility: 2.6, lead: 'Multi-organ deterioration' }
-    case 'recovery':
-      return { hr: -4, spo2: 2, resp: -3, temp: -0.3, riskDrift: -6, volatility: 1.4, lead: 'Clinical improvement' }
-    case 'volatile':
-      return { hr: 3, spo2: -1, resp: 2, temp: 0.1, riskDrift: 1, volatility: 4.2, lead: 'Unstable oscillations' }
-    case 'stable':
-    default:
-      return { hr: 0, spo2: 0, resp: 0, temp: 0, riskDrift: 0, volatility: 1.2, lead: 'Stable monitoring' }
-  }
-}
-
-function seedIcuEnvironment(patients) {
-  const beds = patients.map((p) => p.bed)
-  const takenBeds = new Set()
-
-  return patients.map((patient, index) => {
-    const trajectory = assignTrajectory()
-    const profile = trajectoryProfile(trajectory)
-
-    // Ensure beds remain unique even if upstream data repeats.
-    let bed = patient.bed || `ICU-${index + 1}`
-    if (takenBeds.has(bed)) {
-      bed = randomPick(beds.filter((b) => b && !takenBeds.has(b))) || `ICU-${String(index + 1).padStart(2, '0')}`
-    }
-    takenBeds.add(bed)
-
-    const baselineRisk = clamp(
-      trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk,
-      8,
-      95
-    )
-
-    return {
-      ...patient,
-      bed,
-      risk: Math.round(baselineRisk),
-      trend: '+0',
-      lead: profile.lead,
-      trajectory,
-      waveform: [...patient.waveform.slice(0, -1), Math.round(baselineRisk)],
-      history: [{ t: Date.now(), ...patient.vitals, risk: Math.round(baselineRisk) }],
-    }
-  })
-}
-
-function scoreContributions(vitals) {
-  return (
-    (vitals.HR - 85) * 0.24 +
-    (92 - vitals.SpO2) * 1.7 +
-    (vitals.Resp - 18) * 0.6 +
-    (vitals.Temp - 37) * 4.5
-  )
-}
 
 function statusForRisk(risk) {
   if (risk >= 85) return 'Critical'
@@ -203,72 +78,19 @@ function mapLivePatient(detail) {
   }
 }
 
-function updatePatient(patient, scenarioProfile, scenarioLead) {
-  const trajectory = patient.trajectory || 'stable'
-  const traj = trajectoryProfile(trajectory)
-  const randomizer = Math.max(0.8, (scenarioProfile.volatility + traj.volatility) / 2)
-
-  const combined = {
-    hr: scenarioProfile.hr + traj.hr,
-    spo2: scenarioProfile.spo2 + traj.spo2,
-    resp: scenarioProfile.resp + traj.resp,
-    temp: scenarioProfile.temp + traj.temp,
-    riskDrift: scenarioProfile.riskDrift + traj.riskDrift,
-  }
-
-  const nextVitals = {
-    HR: Math.round(clamp(patient.vitals.HR + combined.hr * 0.35 + randomCentered(randomizer), 45, 170)),
-    SpO2: Math.round(clamp(patient.vitals.SpO2 + combined.spo2 * 0.25 + randomCentered(randomizer * 0.35), 75, 100)),
-    Resp: Math.round(clamp(patient.vitals.Resp + combined.resp * 0.25 + randomCentered(randomizer * 0.4), 10, 42)),
-    Temp: Number(clamp(patient.vitals.Temp + combined.temp * 0.12 + randomCentered(randomizer * 0.03), 34.5, 41).toFixed(1)),
-  }
-
-  const nextRisk = Math.round(
-    clamp(
-      patient.risk + combined.riskDrift * 0.35 + scoreContributions(nextVitals) * 0.05 + randomCentered(randomizer),
-      8,
-      99
-    )
-  )
-  const riskChange = nextRisk - patient.risk
-  // Compute lead: prefer an explicit deterioration label when risk is critical,
-  // otherwise use trajectory-specific lead for recovering trajectories,
-  // and fall back to the current scenario lead.
-  let leadLabel = scenarioLead
-  if (nextRisk >= 85) {
-    leadLabel = 'Multi-organ deterioration'
-  } else if (nextRisk < 45) {
-    leadLabel = 'Baseline recovery'
-  } else if (patient.trajectory === 'recovery') {
-    leadLabel = traj.lead
-  }
-
-  return {
-    ...patient,
-    risk: nextRisk,
-    trend: `${riskChange >= 0 ? '+' : ''}${riskChange}`,
-    status: statusForRisk(nextRisk),
-    lead: leadLabel,
-    vitals: nextVitals,
-    waveform: [...patient.waveform.slice(1), nextRisk],
-  }
-}
-
 export function SimulationProvider({ children }) {
-  const [activeScenario, setActiveScenario] = useState('baseline')
-  const [patientQueue, setPatientQueue] = useState(() => seedIcuEnvironment(DEFAULT_PATIENTS))
+  const [patientQueue, setPatientQueue] = useState([])
   const [lastUpdated, setLastUpdated] = useState(new Date())
-  const [isPaused, setIsPaused] = useState(true)
   const [backendStatus, setBackendStatus] = useState('checking')
   const [backendError, setBackendError] = useState(null)
   const [backendVersion, setBackendVersion] = useState(null)
-  // Data source: 'simulated' runs the local engine, 'live' mirrors the shared
-  // backend scenario engine, 'replay' shows whatever the backend has actually
-  // ingested (PhysioNet replay, devices, or simulation posts).
-  const [source, setSource] = useState('simulated')
+  // Data source: 'live' mirrors the shared backend scenario engine so every
+  // browser sees identical beds; 'replay' shows whatever the backend has
+  // actually ingested (PhysioNet replay or device posts). There is no local
+  // simulation anymore — one shared state for everyone.
+  const [source, setSource] = useState('live')
   const [liveMeta, setLiveMeta] = useState({ scenario: 'baseline', scenarioLabel: 'Baseline Mix', tick: 0, paused: true })
   const [liveError, setLiveError] = useState(null)
-  const lastIngestTime = React.useRef({}) // Track last ingest time per patient
   const checkSeqRef = React.useRef(0)
   const healthControllerRef = React.useRef(null)
   const versionControllerRef = React.useRef(null)
@@ -340,8 +162,8 @@ export function SimulationProvider({ children }) {
 
   const retryBackend = useCallback(() => checkBackend({ indicate: true }), [checkBackend])
 
-  // Synthetic display is only meaningful with a live backend. While the
-  // backend is unreachable, stop advancing the beds as well as ingesting them.
+  // Views only render when the backend is reachable; the gate lives in the
+  // route components via BackendStatusPanel.
   useEffect(() => {
     let cancelled = false
     let intervalId
@@ -360,58 +182,7 @@ export function SimulationProvider({ children }) {
     }
   }, [checkBackend])
 
-  // Send vitals to backend for alert processing (with cooldown)
-  useEffect(() => {
-    if (isPaused || backendStatus !== 'online' || source !== 'simulated') return undefined
-
-    const intervalId = window.setInterval(() => {
-      if (document.visibilityState === 'hidden') return
-      const { profile, lead } = SCENARIOS[activeScenario]
-      setPatientQueue((current) => {
-        const updated = current.map((patient) => {
-          const next = updatePatient(patient, profile, lead)
-          return {
-            ...next,
-            history: [...(patient.history || []), { t: Date.now(), ...next.vitals, risk: next.risk }].slice(-60),
-          }
-        })
-        const now = Date.now()
-        const INGEST_COOLDOWN_MS = 10000 // Send vitals max once every 10 seconds per patient
-        
-        // Send each patient's vitals to backend for risk scoring and alerts
-        updated.forEach((patient) => {
-          const lastTime = lastIngestTime.current[patient.patient_id] || 0
-          
-          // Only send if cooldown has passed
-          if (now - lastTime >= INGEST_COOLDOWN_MS) {
-            const vital = {
-              patient_id: patient.patient_id,
-              timestamp: Date.now() / 1000,
-              HR: patient.vitals.HR,
-              SpO2: patient.vitals.SpO2,
-              RespRate: patient.vitals.Resp,
-              Temp: patient.vitals.Temp,
-            }
-            
-            fetch(`${API_URL}/ingest`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(vital),
-            }).catch((err) => console.warn('Failed to ingest vital:', err))
-            
-            lastIngestTime.current[patient.patient_id] = now
-          }
-        })
-        
-        return updated
-      })
-      setLastUpdated(new Date())
-    }, 1000)
-    return () => window.clearInterval(intervalId)
-  }, [activeScenario, backendStatus, isPaused, source])
-
-  // Backend live mode: mirror the shared scenario engine. Local simulation
-  // stays off while live so the two never fight over patientQueue.
+  // Backend live mode: mirror the shared scenario engine.
   const reloadLive = useCallback(async () => {
     try {
       const res = await fetch(`${API_URL}/simulation/state`)
@@ -506,58 +277,36 @@ export function SimulationProvider({ children }) {
   }, [])
 
   const setDataSource = useCallback((next) => {
+    if (next !== 'live' && next !== 'replay') return
     setSource(next)
     setLiveError(null)
-    if (next === 'simulated') {
-      setPatientQueue(seedIcuEnvironment(DEFAULT_PATIENTS))
-      setActiveScenario('baseline')
-      setIsPaused(true)
-      setLastUpdated(new Date())
-    }
+    setLastUpdated(new Date())
   }, [])
 
   const value = useMemo(
-    () => {
-      const live = source === 'live'
-      return {
-        activeScenario: live ? liveMeta.scenario : activeScenario,
-        activeScenarioLabel: live ? liveMeta.scenarioLabel : SCENARIOS[activeScenario].label,
-        scenarioEntries: Object.entries(SCENARIOS),
-        patientQueue,
-        lastUpdated,
-        isPaused: live ? liveMeta.paused : isPaused,
-        backendOnline: backendStatus === 'online',
-        backendChecking: backendStatus === 'checking',
-        backendError,
-        backendVersion,
-        retryBackend,
+    () => ({
+      activeScenario: liveMeta.scenario,
+      activeScenarioLabel: liveMeta.scenarioLabel,
+      scenarioEntries: Object.entries(SCENARIOS),
+      patientQueue,
+      lastUpdated,
+      isPaused: liveMeta.paused,
+      backendOnline: backendStatus === 'online',
+      backendChecking: backendStatus === 'checking',
+      backendError,
+      backendVersion,
+      retryBackend,
       source,
       setDataSource,
       liveError,
       liveMeta,
       reloadLive,
       reloadReplay,
-        setActiveScenario: (key) => {
-          if (live) controlLive('set_scenario', key)
-          else setActiveScenario(key)
-        },
-        toggleSimulation: () => {
-          if (live) controlLive(liveMeta.paused ? 'start' : 'pause')
-          else setIsPaused((current) => !current)
-        },
-        resetSimulation: () => {
-          if (live) {
-            controlLive('reset')
-            return
-          }
-          setPatientQueue(seedIcuEnvironment(DEFAULT_PATIENTS))
-          setActiveScenario('baseline')
-          setIsPaused(true)
-          setLastUpdated(new Date())
-        },
-      }
-    },
-    [activeScenario, backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, isPaused, reloadLive, reloadReplay, retryBackend, source]
+      setActiveScenario: (key) => controlLive('set_scenario', key),
+      toggleSimulation: () => controlLive(liveMeta.paused ? 'start' : 'pause'),
+      resetSimulation: () => controlLive('reset'),
+    }),
+    [backendError, backendStatus, backendVersion, controlLive, liveError, liveMeta, patientQueue, lastUpdated, reloadLive, reloadReplay, retryBackend, source]
   )
 
   return <SimulationContext.Provider value={value}>{children}</SimulationContext.Provider>
@@ -579,7 +328,7 @@ export function BackendStatusPanel({ title, backendChecking, backendError, retry
       <header className="page-head">
         <div>
           <h1>{title} unavailable</h1>
-          <p className="muted">The synthetic stream is turned off while the backend is unreachable.</p>
+          <p className="muted">Live views stop while the backend is unreachable.</p>
         </div>
         <div className="page-actions">
           <button type="button" className="btn btn-primary btn-sm" onClick={retryBackend}>
@@ -589,7 +338,7 @@ export function BackendStatusPanel({ title, backendChecking, backendError, retry
       </header>
       <p className="notice notice-error" role="alert">
         Backend unavailable. Live risk scores, model metrics, training jobs, and alert delivery need the
-        backend, so this view is stopped instead of showing simulated patients.
+        backend, so this view is stopped instead of showing stale beds.
       </p>
       {backendError && <p className="muted small">{backendError}</p>}
     </div>

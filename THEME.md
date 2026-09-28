@@ -221,11 +221,11 @@ media query is a bug.
 uses `aria-pressed`; live status uses `aria-live="polite"`; table headers use
 `scope="col"`; loading state uses `role="status"` with `.sr-only` text.
 
-**Honesty.** The simulation banner, research-prototype qualifier, and
+**Honesty.** The research-prototype qualifier and
 not-HIPAA-ready note stay visible. Do not add metrics, certifications, or
-clinical claims that the backend does not produce. The vitals shown are
-client-side simulation (`simulationContext.jsx`), not a patient feed. If
-`/health` is unreachable, the dynamic simulation views stop and show a
+clinical claims that the backend does not produce. Beds come only from the
+backend — never a local simulation, never live patients. If
+`/health` is unreachable, the dynamic views stop and show a
 backend-unavailable error rather than continuing silently.
 
 ---

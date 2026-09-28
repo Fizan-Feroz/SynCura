@@ -20,7 +20,7 @@ function fmtVital(value, digits = 0) {
 
 export default function BedProfile({ theme, onToggleTheme }) {
   const { patientId } = useParams()
-  const { patientQueue, backendOnline, source, activeScenarioLabel } = useSimulation()
+  const { patientQueue, backendOnline, source } = useSimulation()
   const bed = patientQueue.find((p) => p.patient_id === patientId)
   const [shap, setShap] = useState(null)
 
@@ -60,7 +60,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
         <h1>Bed not found</h1>
         <p className="muted">
           No bed with id <span className="num">{patientId}</span> in the current{' '}
-          {source === 'live' ? 'backend live' : 'simulated'} view. It may live in the other data
+          {source === 'live' ? 'backend live' : 'replay'} view. It may live in the other data
           source — switch source on the dashboard.
         </p>
       </div>
@@ -85,7 +85,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
           <p className="muted">
             <span className={`status status-${tone}`}>{riskLabel(bed.risk)}</span>
             {' · '}
-            {source === 'live' ? 'Shared backend simulation' : source === 'replay' ? 'Backend ingest · retrospective' : `Simulated · ${activeScenarioLabel}`} · {bed.lead}
+            {source === 'live' ? 'Shared backend simulation' : 'Backend ingest · retrospective'} · {bed.lead}
           </p>
         </div>
         <div className="page-actions">
@@ -177,16 +177,14 @@ export default function BedProfile({ theme, onToggleTheme }) {
             Backend model agrees on: {shap.map(([name]) => name).join(', ')} (top SHAP features).
           </p>
         ) : (
-          <p className="small muted">A simplified view of the simulation, not the model’s attention or SHAP values.</p>
+          <p className="small muted">A simplified view of the bed state, not the model’s attention or SHAP values.</p>
         )}
       </section>
 
       <p className="muted small" style={{ marginTop: 'var(--space-5)' }}>
         {source === 'live'
           ? 'Shared backend simulation — demo, not for clinical use.'
-          : source === 'replay'
-            ? 'Backend-ingested retrospective data — demo, not for clinical use.'
-            : 'Demo with simulated patients — not for clinical use.'}
+          : 'Backend-ingested retrospective data — demo, not for clinical use.'}
       </p>
     </div>
   )

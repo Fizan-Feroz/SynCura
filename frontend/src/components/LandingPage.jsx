@@ -34,9 +34,9 @@ const METRICS = [
 ]
 
 const DESTINATIONS = [
-  { to: '/dashboard', name: 'Central station', body: 'Twelve synthetic beds ranked by risk, with scenarios, alert threshold tuning and a NEWS2 comparison.' },
+  { to: '/dashboard', name: 'Central station', body: 'Twelve backend beds ranked by risk, with scenarios, alert threshold tuning and a NEWS2 comparison.' },
   { to: '/waveforms', name: 'Waveforms', body: 'Per-bed trends for heart rate, SpO2, respiration and temperature, drawn like monitor channels.' },
-  { to: '/simulated-data', name: 'Data feed', body: 'The raw stream the dashboard sends to the backend, one row per bed.' },
+  { to: '/data-feed', name: 'Data feed', body: 'One row per bed, read back from the backend.' },
   { to: '/training', name: 'Training', body: 'Start a training job against your PhysioNet files and watch loss and AUC as it runs.', internal: true },
   { to: '/architecture', name: 'Architecture', body: 'The pipeline from sensor to score, the stack, and the limits of this prototype.' },
 ]
@@ -143,7 +143,7 @@ export default function LandingPage({ theme, onToggleTheme }) {
         <section className="section inside" aria-labelledby="inside-title">
           <div className="section-head">
             <h2 id="inside-title">Inside the prototype</h2>
-            <p className="muted">Every screen runs on synthetic patients, so you can try it without clinical data.</p>
+            <p className="muted">Every screen runs on backend beds shared by all visitors — try it without clinical data.</p>
           </div>
           <ul className="destinations">
             {PUBLIC_DESTINATIONS.map((d) => (

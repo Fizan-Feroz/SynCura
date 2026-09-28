@@ -235,16 +235,11 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <p className="muted small">
               {live
                 ? 'Shared backend simulation — every visitor sees these same beds, scored by the deployed model.'
-                : replay
-                  ? 'Backend ingests — real retrospective stays and device posts, scored live by the deployed model. Not live patients.'
-                  : 'Synthetic patients. Scores on this screen are simulated in your browser; every reading is also sent to the backend model.'}
+                : 'Backend ingests — real retrospective stays and device posts, scored live by the deployed model. Not live patients.'}
             </p>
           </div>
           <div className="station-controls">
             <div className="segmented" role="group" aria-label="Data source">
-              <button type="button" aria-pressed={!live && !replay} onClick={() => (live || replay) && setDataSource('simulated')}>
-                Simulated
-              </button>
               <button type="button" aria-pressed={live} onClick={() => !live && setDataSource('live')}>
                 Backend live
               </button>
@@ -328,7 +323,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <dd className="num">{patientQueue.length}</dd>
           </div>
           <div>
-            <dt>Lead time, simulated</dt>
+            <dt>Lead time, est.</dt>
             <dd className="num">{leadTime}<small>h</small></dd>
           </div>
           <div>
@@ -381,7 +376,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                       </li>
                     ))}
                   </ul>
-                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : replay ? 'Backend-ingested retrospective data — demo, not for clinical use.' : 'Demo with simulated patients — not for clinical use.'}</p>
+                  <p className="muted small">{live ? 'Shared backend simulation — demo, not for clinical use.' : 'Backend-ingested retrospective data — demo, not for clinical use.'}</p>
                 </>
               )}
             </section>
@@ -413,7 +408,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 <tr><th scope="row">NEWS2 at 7 or more</th><td className="num">{news2Perf.sensitivity}%</td><td className="num">{news2Perf.specificity}%</td></tr>
               </tbody>
             </table>
-            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : replay ? 'Computed on backend-ingested beds, so it shows the idea, not real performance.' : 'Computed on the simulated beds, so it shows the idea, not real performance.'}</p>
+            <p className="small muted">{live ? 'Computed on the shared backend beds, so it shows the idea, not real performance.' : 'Computed on backend-ingested beds, so it shows the idea, not real performance.'}</p>
           </div>
 
           <div className="lower-block">

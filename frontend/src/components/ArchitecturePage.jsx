@@ -21,7 +21,7 @@ const LIMITS = [
   'No authentication, encryption or audit log. Run it on a trusted local network only.',
   'The label is in-hospital death from PhysioNet 2012, used as a stand-in for deterioration.',
   'The holdout set also guided which models joined the ensemble, so its AUC is slightly optimistic.',
-  'Dashboard patients are simulated; their scores are not the model’s output.',
+  'Dashboard beds come from the shared backend — simulation engine or ingested stays — never live patients.',
 ]
 
 export default function ArchitecturePage() {

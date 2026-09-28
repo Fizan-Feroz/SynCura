@@ -7,7 +7,7 @@ import { BrandMark, Wordmark } from './Brand'
 const NAV = [
   { to: '/dashboard', label: 'Central station' },
   { to: '/waveforms', label: 'Waveforms' },
-  { to: '/simulated-data', label: 'Data feed' },
+  { to: '/data-feed', label: 'Data feed' },
   { to: '/training', label: 'Training', internal: true },
   { to: '/architecture', label: 'Architecture' },
 ].filter((item) => TRAINING_ENABLED || !item.internal)

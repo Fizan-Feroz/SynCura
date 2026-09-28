@@ -22,11 +22,11 @@
 
 ## Release
 
-- Website: **v1.4.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
+- Website: **v1.5.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
 - Deployed model: `syncura-attention-lstm-ensemble-v1`, per `ml/deployed_manifest.json`.
 - Deployment check: `GET /version` reports the backend’s website version, model, and git commit.
 - Training UI is internal-only: public builds hide it unless built with `VITE_ENABLE_TRAINING=true`.
-- Data sources (dashboard toggle): `Simulated` (browser-local), `Backend live` (shared scenario engine), `Replay` (whatever the backend ingested — PhysioNet replay, devices, or simulation posts).
+- Data sources (dashboard toggle): `Backend live` (shared scenario engine — every visitor sees the same beds) and `Replay` (whatever the backend ingested — PhysioNet replay, devices, or simulation posts). There is no per-browser simulation.
 - Retrospective replay: `python backend/replay.py --mode http --url <backend>/ingest --physionet <set-a dir> --outcomes <Outcomes-a.txt> --speed 60 --max-patients 6`, then open the Replay source. Real de-identified stays, not live patients.
 
 ## Architecture
