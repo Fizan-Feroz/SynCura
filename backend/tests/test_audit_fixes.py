@@ -341,8 +341,8 @@ def test_train_defaults_match_serving_contract(tmp_path):
     import backend.inference as inf
     assert train.SERVING_FEATURES == inf.FEATURES
     set_dir, outcomes = _write_physionet(tmp_path)
-    protected = [os.path.join(REPO, 'ml', 'scaler.json'),
-                 os.path.join(REPO, 'ml', 'models', 'lstm_baseline.pt')]
+    fallback = _write_fallback_checkpoint(tmp_path / 'protected_baseline.pt')
+    protected = [os.path.join(REPO, 'ml', 'scaler.json'), fallback]
     before = [_sha(p) for p in protected]
     run_dir = tmp_path / 'run'
     metrics = train.main(['--physionet', set_dir, '--outcomes', outcomes, '--epochs', '1',
@@ -354,6 +354,18 @@ def test_train_defaults_match_serving_contract(tmp_path):
     import torch
     state = torch.load(run_dir / 'model.pt', weights_only=True)
     assert tuple(state['lstm.weight_ih_l0'].shape) == (4 * 96, 12)
+
+
+def _write_fallback_checkpoint(path):
+    """Fresh single-model checkpoint for fallback tests.
+
+    Generated, not copied from the repo: ml/models/lstm_baseline.pt is
+    deliberately untracked, so tests must not depend on it existing.
+    """
+    import torch
+    from ml.train_lstm import AttentionLSTMModel
+    torch.save(AttentionLSTMModel(input_size=12, hidden_size=96).state_dict(), str(path))
+    return str(path)
 
 
 def test_train_deploy_refuses_unservable_config(tmp_path):
@@ -392,7 +404,7 @@ def test_deploy_artifacts_writes_sibling_scaler(tmp_path):
 def test_single_model_fallback_loads(tmp_path):
     from backend.inference import RiskScoreEngine
     model = tmp_path / 'lstm_baseline.pt'
-    shutil.copy(os.path.join(REPO, 'ml', 'models', 'lstm_baseline.pt'), model)
+    _write_fallback_checkpoint(model)
     e = RiskScoreEngine(model_path=str(model), manifest_path=str(tmp_path / 'none.json'))
     assert e.model is not None and e.models == []
     assert e._train_mean is not None, 'shared ml/scaler.json should be the fallback scaler'
@@ -403,7 +415,7 @@ def test_single_model_fallback_loads(tmp_path):
 def test_single_model_prefers_sibling_scaler(tmp_path):
     from backend.inference import RiskScoreEngine
     model = tmp_path / 'lstm_baseline.pt'
-    shutil.copy(os.path.join(REPO, 'ml', 'models', 'lstm_baseline.pt'), model)
+    _write_fallback_checkpoint(model)
     (tmp_path / 'lstm_baseline_scaler.json').write_text(json.dumps({'mean': [7.0] * 12, 'std': [2.0] * 12}))
     e = RiskScoreEngine(model_path=str(model), manifest_path=str(tmp_path / 'none.json'))
     np.testing.assert_allclose(e._train_mean, 7.0)
