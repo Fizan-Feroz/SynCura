@@ -1,0 +1,54 @@
+{
+  "model_id": "syncura-attention-lstm-ensemble-v1",
+  "label": "in-hospital mortality risk (PhysioNet 2012 In-hospital_death). Research prototype; NOT a validated deterioration/sepsis predictor.",
+  "members": [
+    {
+      "id": "s48",
+      "checkpoint": "ml/models/ensemble/s48.pt",
+      "scaler": "ml/scaler.json",
+      "trained_on": "set-a only"
+    },
+    {
+      "id": "c93",
+      "checkpoint": "ml/models/ensemble/c93.pt",
+      "scaler": "ml/scaler_combo8k.json",
+      "trained_on": "set-a + 80% set-b"
+    },
+    {
+      "id": "s45",
+      "checkpoint": "ml/models/ensemble/s45.pt",
+      "scaler": "ml/scaler.json",
+      "trained_on": "set-a only"
+    }
+  ],
+  "arch": {
+    "model_class": "AttentionLSTMModel",
+    "input_size": 12,
+    "note": "input_size must equal len(features); gap (24-dim) models need the serving work in ml/RESULTS_PLAN.md",
+    "hidden_size": 96,
+    "num_layers": 2,
+    "dropout": 0.3,
+    "bidirectional": false
+  },
+  "features": [
+    "HR",
+    "RespRate",
+    "Temp",
+    "NISysABP",
+    "NIDiasABP",
+    "SpO2",
+    "GCS",
+    "BUN",
+    "Creatinine",
+    "WBC",
+    "Platelets",
+    "Glucose"
+  ],
+  "window_minutes": 90,
+  "decision_threshold": 0.5,
+  "val_auc": 0.8401,
+  "fresh_holdout_auc": 0.8441,
+  "fresh_holdout_note": "20% of set-b patients (seed 123), unseen by weights but USED during ensemble selection; not a locked final test set.",
+  "full_setb_holdout": null,
+  "full_setb_note": "N/A: member c93 trained on 80% of set-b."
+}

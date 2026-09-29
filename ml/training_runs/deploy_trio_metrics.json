@@ -1,0 +1,39 @@
+{
+  "members": [
+    "E1/seed12",
+    "E1/seed13",
+    "c19/seed53"
+  ],
+  "val": {
+    "auc": 0.8404,
+    "accuracy": 0.743,
+    "sensitivity": 0.7617,
+    "specificity": 0.7395,
+    "precision": 0.3542,
+    "f1": 0.4835
+  },
+  "holdout": {
+    "auc": 0.8338,
+    "accuracy": 0.7592,
+    "sensitivity": 0.8027,
+    "specificity": 0.7519,
+    "precision": 0.3508,
+    "f1": 0.4882
+  },
+  "val_thr0.7": {
+    "auc": 0.8404,
+    "accuracy": 0.8418,
+    "sensitivity": 0.48,
+    "specificity": 0.9097,
+    "precision": 0.4993,
+    "f1": 0.4895
+  },
+  "holdout_thr0.7": {
+    "auc": 0.8338,
+    "accuracy": 0.8531,
+    "sensitivity": 0.5204,
+    "specificity": 0.9087,
+    "precision": 0.4875,
+    "f1": 0.5034
+  }
+}

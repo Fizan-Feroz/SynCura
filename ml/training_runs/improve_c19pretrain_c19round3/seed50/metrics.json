@@ -1,0 +1,32 @@
+{
+  "config": "c19pretrain-seed50",
+  "model_class": "attention",
+  "features": [
+    "HR",
+    "RespRate",
+    "Temp",
+    "NISysABP",
+    "NIDiasABP",
+    "SpO2",
+    "GCS",
+    "BUN",
+    "Creatinine",
+    "WBC",
+    "Platelets",
+    "Glucose"
+  ],
+  "window": 90,
+  "horizon": 12.0,
+  "dropout": 0.3,
+  "lr": 0.0001,
+  "hidden": 96,
+  "causal": true,
+  "train": "challenge2019-setA 90pct (sepsis-onset flag; GCS all-NaN)",
+  "eval": "challenge2019-setA 10pct (seed 7, NOT comparable to mortality AUC)",
+  "best_auc": 0.7371673822726452,
+  "val_auc": 0.7371673822726452,
+  "val_accuracy": 0.677224611313265,
+  "val_recall": 0.6885468537799909,
+  "epochs_trained": 20,
+  "seed": 50
+}

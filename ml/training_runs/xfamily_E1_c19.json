@@ -1,0 +1,9 @@
+{
+  "members": [
+    "improve_baseline_E1/seed13",
+    "improve_c19finetune_c19round3/seed53",
+    "improve_baseline_E1/seed12"
+  ],
+  "val_auc": 0.8404454454327118,
+  "holdout_auc": 0.8337570439094852
+}

@@ -1,0 +1,27 @@
+{
+  "members": [
+    "improve_c19finetune_c19round3/seed53",
+    "improve_c19finetune_c19round3/seed52"
+  ],
+  "checkpoints": [
+    "ml\\training_runs\\improve_c19finetune_c19round3\\seed53\\model.pt",
+    "ml\\training_runs\\improve_c19finetune_c19round3\\seed52\\model.pt"
+  ],
+  "scalers": [
+    "ml\\training_runs\\improve_c19finetune_c19round3\\seed53\\scaler.json",
+    "ml\\training_runs\\improve_c19finetune_c19round3\\seed52\\scaler.json"
+  ],
+  "model_classes": [
+    "attention",
+    "attention"
+  ],
+  "val_auc": 0.821066633422888,
+  "val_accuracy": 0.7333241927743882,
+  "val_recall": 0.7647569444444444,
+  "fresh_holdout_auc": 0.8315492283717337,
+  "fresh_holdout_accuracy": 0.7479071537290716,
+  "fresh_holdout_recall": 0.7779255319148937,
+  "candidate_only": true,
+  "holdout_gate": 0.83,
+  "passes_gate": true
+}

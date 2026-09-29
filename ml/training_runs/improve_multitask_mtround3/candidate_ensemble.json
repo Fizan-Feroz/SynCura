@@ -1,0 +1,27 @@
+{
+  "members": [
+    "improve_multitask_mtround3/seed61",
+    "improve_multitask_mtround3/seed62"
+  ],
+  "checkpoints": [
+    "ml\\training_runs\\improve_multitask_mtround3\\seed61\\model.pt",
+    "ml\\training_runs\\improve_multitask_mtround3\\seed62\\model.pt"
+  ],
+  "scalers": [
+    "ml\\training_runs\\improve_multitask_mtround3\\seed61\\scaler.json",
+    "ml\\training_runs\\improve_multitask_mtround3\\seed62\\scaler.json"
+  ],
+  "model_classes": [
+    "attention",
+    "attention"
+  ],
+  "val_auc": 0.8211749018517011,
+  "val_accuracy": 0.7390141907177624,
+  "val_recall": 0.8025173611111112,
+  "fresh_holdout_auc": 0.8370362737718824,
+  "fresh_holdout_accuracy": 0.7409944190766109,
+  "fresh_holdout_recall": 0.785904255319149,
+  "candidate_only": true,
+  "holdout_gate": 0.83,
+  "passes_gate": true
+}

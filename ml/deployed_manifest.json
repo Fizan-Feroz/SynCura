@@ -1,24 +1,24 @@
 {
-  "model_id": "syncura-attention-lstm-ensemble-v1",
+  "model_id": "syncura-attention-lstm-ensemble-v2",
   "label": "in-hospital mortality risk (PhysioNet 2012 In-hospital_death). Research prototype; NOT a validated deterioration/sepsis predictor.",
   "members": [
     {
-      "id": "s48",
-      "checkpoint": "ml/models/ensemble/s48.pt",
-      "scaler": "ml/scaler.json",
-      "trained_on": "set-a only"
+      "id": "e12",
+      "checkpoint": "ml/models/ensemble/e12.pt",
+      "scaler": "ml/models/ensemble/e12.scaler.json",
+      "trained_on": "E1 causal set (set-a_full excl val + 80pct set-b excl locked)"
     },
     {
-      "id": "c93",
-      "checkpoint": "ml/models/ensemble/c93.pt",
-      "scaler": "ml/scaler_combo8k.json",
-      "trained_on": "set-a + 80% set-b"
+      "id": "e13",
+      "checkpoint": "ml/models/ensemble/e13.pt",
+      "scaler": "ml/models/ensemble/e13.scaler.json",
+      "trained_on": "E1 causal set (set-a_full excl val + 80pct set-b excl locked)"
     },
     {
-      "id": "s45",
-      "checkpoint": "ml/models/ensemble/s45.pt",
-      "scaler": "ml/scaler.json",
-      "trained_on": "set-a only"
+      "id": "c53",
+      "checkpoint": "ml/models/ensemble/c53.pt",
+      "scaler": "ml/models/ensemble/c53.scaler.json",
+      "trained_on": "Challenge-2019 warm-start, finetuned on E1 causal set (lr 3e-5)"
     }
   ],
   "arch": {
@@ -46,9 +46,25 @@
   ],
   "window_minutes": 90,
   "decision_threshold": 0.5,
-  "val_auc": 0.8401,
-  "fresh_holdout_auc": 0.8441,
-  "fresh_holdout_note": "20% of set-b patients (seed 123), unseen by weights but USED during ensemble selection; not a locked final test set.",
+  "val_auc": 0.8404,
+  "val_metrics": {
+    "accuracy": 0.743,
+    "sensitivity": 0.7617,
+    "specificity": 0.7395,
+    "precision": 0.3542,
+    "f1": 0.4835
+  },
+  "fresh_holdout_auc": 0.8338,
+  "fresh_holdout_metrics": {
+    "accuracy": 0.7592,
+    "sensitivity": 0.8027,
+    "specificity": 0.7519,
+    "precision": 0.3508,
+    "f1": 0.4882
+  },
+  "fresh_holdout_note": "20% of set-b patients (seed 123), excl. both locked slices; unseen by weights but USED during ensemble selection; not a locked final test set.",
+  "selection": "greedy val-gated over E1 (seed12/13) + c19-finetune (seed51-53) families; winner e13+c53+e12, see ml/training_runs/xfamily_mega.json and deploy_trio_metrics.json.",
+  "deploy_signoff": "Member c53 carries Challenge-2019 influence via warm-start. Registry clears challenge2019 for train, not deploy_train; user-directed deploy of this exact candidate on 2026-09-30 is recorded here as the deliberate sign-off. Previous manifest preserved at ml/deployed_manifest.v1.json (s48+c93+s45, pre-fix leaky pipeline).",
   "full_setb_holdout": null,
-  "full_setb_note": "N/A: member c93 trained on 80% of set-b."
+  "full_setb_note": "N/A: members trained on 80% of set-b."
 }
