@@ -1,5 +1,6 @@
 import React, { Suspense, lazy, useEffect, useState } from 'react'
 import { BrowserRouter, Navigate, Routes, Route, useLocation } from 'react-router-dom'
+import { Analytics } from '@vercel/analytics/react'
 import { TRAINING_ENABLED } from './config'
 import { SimulationProvider } from './simulationContext'
 import AppShell from './components/AppShell'
@@ -104,6 +105,7 @@ export default function App() {
             <Route path="/admin" element={shell(<AdminPanel />, { wide: true })} />
           </Routes>
         </Suspense>
+        <Analytics />
       </BrowserRouter>
     </SimulationProvider>
   )
