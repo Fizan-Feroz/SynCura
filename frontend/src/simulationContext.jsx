@@ -74,6 +74,15 @@ async function loadDemoSeed() {
   return Array.isArray(list) ? list : []
 }
 
+// Mirrors backend/simulation.py: modest non-baseline gain (1.2, not 2.0 —
+// hotter gains pin every bed at the clamp rails) plus per-bed drift jitter
+// so identical scenarios still produce distinct beds. Labs ride along
+// anchored near population-normal values (seed JSON carries them).
+const DEMO_DRIFT_GAIN = 1.2
+const DEMO_LAB_ANCHORS = { GCS: 15, BUN: 18.0, Creatinine: 1.0, WBC: 8.0, Platelets: 250.0, Glucose: 110.0 }
+const DEMO_LAB_NOISE = { GCS: 0, BUN: 0.4, Creatinine: 0.03, WBC: 0.15, Platelets: 4.0, Glucose: 1.5 }
+const DEMO_LAB_BOUNDS = { GCS: [3, 15], BUN: [5, 80], Creatinine: [0.4, 6.0], WBC: [1.0, 30.0], Platelets: [20.0, 600.0], Glucose: [60.0, 300.0] }
+
 function seedDemoBeds(patients) {
   return (Array.isArray(patients) ? patients : []).map((patient) => {
     const trajectory = assignTrajectory()
@@ -82,14 +91,20 @@ function seedDemoBeds(patients) {
       trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk,
       8, 95
     ))
+    const vitals = { ...patient.vitals }
+    for (const [lab, anchor] of Object.entries(DEMO_LAB_ANCHORS)) {
+      if (!Number.isFinite(vitals[lab])) vitals[lab] = anchor
+    }
     return {
       ...patient,
       risk,
       trend: '+0',
       lead: profile.lead,
       trajectory,
+      drift_mult: 0.85 + Math.random() * 0.3,
+      vitals,
       waveform: [...patient.waveform.slice(0, -1), risk],
-      history: [{ t: Date.now(), ...patient.vitals, risk }],
+      history: [{ t: Date.now(), ...vitals, risk }],
     }
   })
 }
@@ -103,16 +118,17 @@ function scoreContributionsDemo(vitals) {
   )
 }
 
-function updateDemoBed(patient, scenarioProfile, scenarioLead) {
+function updateDemoBed(patient, scenarioProfile, scenarioLead, gain = 1.0) {
   const trajectory = patient.trajectory || 'stable'
   const traj = trajectoryProfile(trajectory)
   const randomizer = Math.max(0.8, (scenarioProfile.volatility + traj.volatility) / 2)
+  const jitter = Number.isFinite(patient.drift_mult) ? patient.drift_mult : 1.0
   const combined = {
-    hr: scenarioProfile.hr + traj.hr,
-    spo2: scenarioProfile.spo2 + traj.spo2,
-    resp: scenarioProfile.resp + traj.resp,
-    temp: scenarioProfile.temp + traj.temp,
-    riskDrift: scenarioProfile.riskDrift + traj.riskDrift,
+    hr: (scenarioProfile.hr + traj.hr) * gain * jitter,
+    spo2: (scenarioProfile.spo2 + traj.spo2) * gain * jitter,
+    resp: (scenarioProfile.resp + traj.resp) * gain * jitter,
+    temp: (scenarioProfile.temp + traj.temp) * gain * jitter,
+    riskDrift: (scenarioProfile.riskDrift + traj.riskDrift) * gain * jitter,
   }
   const nextVitals = {
     HR: Math.round(clamp(patient.vitals.HR + combined.hr * 0.35 + randomCentered(randomizer), 45, 170)),
@@ -120,8 +136,18 @@ function updateDemoBed(patient, scenarioProfile, scenarioLead) {
     Resp: Math.round(clamp(patient.vitals.Resp + combined.resp * 0.25 + randomCentered(randomizer * 0.4), 10, 42)),
     Temp: Number(clamp(patient.vitals.Temp + combined.temp * 0.12 + randomCentered(randomizer * 0.03), 34.5, 41).toFixed(1)),
   }
+  for (const [lab, anchor] of Object.entries(DEMO_LAB_ANCHORS)) {
+    const prev = patient.vitals[lab]
+    const base = Number.isFinite(prev) ? prev : anchor
+    const [lo, hi] = DEMO_LAB_BOUNDS[lab]
+    const val = clamp(base + randomCentered(DEMO_LAB_NOISE[lab]), lo, hi)
+    nextVitals[lab] = lab === 'GCS' ? Math.round(val) : Math.round(val * 10) / 10
+  }
+  // Mirrors backend/simulation.py: pull toward the vitals-implied level so
+  // open-loop drift cannot march every bed to the 99 clamp.
+  const implied = clamp(30 + scoreContributionsDemo(nextVitals) * 0.35, 8, 99)
   const nextRisk = Math.round(clamp(
-    patient.risk + combined.riskDrift * 0.35 + scoreContributionsDemo(nextVitals) * 0.05 + randomCentered(randomizer),
+    patient.risk + (implied - patient.risk) * 0.3 + combined.riskDrift * 0.05 + randomCentered(randomizer * 0.5),
     8, 99
   ))
   const riskChange = nextRisk - patient.risk
@@ -180,6 +206,12 @@ export function mapLivePatient(detail) {
       SpO2: pickLatestNumber(rows, 'spo2'),
       Resp: pickLatestNumber(rows, 'rr'),
       Temp: pickLatestNumber(rows, 'temp'),
+      GCS: pickLatestNumber(rows, 'gcs'),
+      BUN: pickLatestNumber(rows, 'bun'),
+      Creatinine: pickLatestNumber(rows, 'creatinine'),
+      WBC: pickLatestNumber(rows, 'wbc'),
+      Platelets: pickLatestNumber(rows, 'platelets'),
+      Glucose: pickLatestNumber(rows, 'glucose'),
     },
   }
 }
@@ -372,7 +404,8 @@ export function SimulationProvider({ children }) {
     const intervalId = window.setInterval(() => {
       if (document.visibilityState === 'hidden' || cancelled) return
       const { profile, lead } = SCENARIOS[demoScenario]
-      setPatientQueue((current) => current.map((patient) => updateDemoBed(patient, profile, lead)))
+      const gain = demoScenario === 'baseline' ? 1.0 : DEMO_DRIFT_GAIN
+      setPatientQueue((current) => current.map((patient) => updateDemoBed(patient, profile, lead, gain)))
       setLastUpdated(new Date())
     }, 1000)
     return () => {

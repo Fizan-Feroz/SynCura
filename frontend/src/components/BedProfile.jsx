@@ -13,6 +13,21 @@ const CHANNELS = [
   { key: 'Temp', label: 'Temperature', short: 'Temp', unit: '°C', color: 'var(--temp)', digits: 1 },
 ]
 
+// Labs + neuro: the other 6 model features. Demo/local sources don't carry
+// them (values render as —); live backend rows do (see mapLivePatient).
+const LABS = [
+  { key: 'GCS', label: 'GCS', unit: '', range: [3, 15], rangeText: '3–15' },
+  { key: 'BUN', label: 'BUN', unit: 'mg/dL', range: [6, 24], rangeText: '6–24' },
+  { key: 'Creatinine', label: 'Creatinine', unit: 'mg/dL', range: [0.6, 1.2], rangeText: '0.6–1.2', digits: 1 },
+  { key: 'WBC', label: 'WBC', unit: '×10³/µL', range: [4.5, 11], rangeText: '4.5–11', digits: 1 },
+  { key: 'Platelets', label: 'Platelets', unit: '×10³/µL', range: [150, 450], rangeText: '150–450' },
+  { key: 'Glucose', label: 'Glucose', unit: 'mg/dL', range: [70, 140], rangeText: '70–140' },
+]
+
+function inRange(value, range) {
+  return Number.isFinite(value) && value >= range[0] && value <= range[1]
+}
+
 function fmtVital(value, digits = 0) {
   if (!Number.isFinite(value)) return '—'
   return digits ? value.toFixed(digits) : value
@@ -152,6 +167,34 @@ export default function BedProfile({ theme, onToggleTheme }) {
           )
         })}
       </div>
+
+      <section className="rail-block" aria-label="Labs and neuro" style={{ marginTop: 'var(--space-5)' }}>
+        <div className="rail-head">
+          <h2>Labs &amp; neuro</h2>
+          <span className="muted small">model features 7–12</span>
+        </div>
+        <div className="monitors">
+          {LABS.map((lab) => {
+            const value = bed.vitals?.[lab.key]
+            const ok = inRange(value, lab.range)
+            return (
+              <article key={lab.key} className="monitor">
+                <header className="monitor-head">
+                  <strong>{lab.label}</strong>
+                  <span className="num channel-value" style={ok ? undefined : { '--c': 'var(--warn, #b7791f)' }}>
+                    {fmtVital(value, lab.digits || 0)}
+                    <small>{lab.unit}</small>
+                  </span>
+                </header>
+                <p className="muted small">
+                  ref {lab.rangeText}{lab.unit ? ` ${lab.unit}` : ''} ·{' '}
+                  {Number.isFinite(value) ? (ok ? 'in range' : 'out of range') : 'not reported by this source'}
+                </p>
+              </article>
+            )
+          })}
+        </div>
+      </section>
 
       <section className="rail-block" aria-label="Risk trend" style={{ marginTop: 'var(--space-5)' }}>
         <div className="rail-head">

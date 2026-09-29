@@ -161,3 +161,59 @@ def test_simulation_endpoints():
     assert r.status_code == 400
     # Leave the shared engine running for other tests / manual use.
     client.post('/simulation/control', json={'action': 'start'})
+
+
+def test_respiratory_run_does_not_pin_all_beds_at_rails():
+    """Regression: DRIFT_GAIN 2.0 slammed every bed into identical clamp
+    rails (HR 170 / SpO2 75 / RR 42) within ~10 ticks, collapsing all
+    differentiation. After 40 respiratory ticks beds must still differ."""
+    engine = make_engine(seed=11)
+    engine.control('set_scenario', 'respiratory')
+    for _ in range(40):
+        snap = engine.step()
+    risks = [b['risk'] for b in snap['beds']]
+    vitals = [(b['vitals']['HR'], b['vitals']['SpO2'], b['vitals']['Resp']) for b in snap['beds']]
+    assert len(set(risks)) > 1, f'all 12 risks identical: {risks[0]}'
+    assert len(set(vitals)) > 1, 'all 12 vital triples identical (rail-pinned)'
+    # After 40 deterioration ticks most beds SHOULD look bad (that is the
+    # what-if working); the bug was total collapse. Bound it below totality
+    # with margin: at most 9 of 12 exactly rail-pinned at once.
+    pinned = sum(1 for hr, spo2, rr in vitals if (hr, spo2, rr) == (170, 75, 42))
+    assert pinned <= 9, f'{pinned}/12 beds pinned at rails simultaneously'
+
+
+def test_seed_beds_carry_labs_for_full_scorer_payload():
+    """Beds must carry all 12 model features so the scorer never sees a
+    half-empty window (the other half of the identical-48s bug)."""
+    from backend.simulation import LAB_ANCHORS
+    engine = make_engine(seed=11)
+    for bed in engine.snapshot()['beds']:
+        for lab in LAB_ANCHORS:
+            assert lab in bed['vitals'], lab
+    engine.control('set_scenario', 'respiratory')
+    for _ in range(3):
+        engine.step()
+    for bed in engine.snapshot()['beds']:
+        for lab in LAB_ANCHORS:
+            assert lab in bed['vitals'], lab
+
+
+def test_scores_endpoint_excludes_sim_patients():
+    """GET /scores must never surface sim-xxx engine keys as patients."""
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    client = TestClient(app_module.app)
+    engine = app_module.sim_engine
+    engine.control('start')
+    for _ in range(3):
+        engine.step()
+    # Non-vacuous: the engine really holds sim scores right now...
+    from backend import inference as inference_module
+    live_scores = inference_module.get_engine().risk_scores
+    assert any(str(pid).startswith('sim-') for pid in live_scores), 'test setup: no sim scores present'
+    # ...yet the public endpoint must not surface them.
+    body = client.get('/scores').json()
+    rows = body.get('scores', body) if isinstance(body, dict) else body
+    pids = [p[0] if isinstance(p, (list, tuple)) else p.get('patient_id') for p in rows]
+    assert not any(str(p).startswith('sim-') for p in pids), pids
+    engine.control('pause')

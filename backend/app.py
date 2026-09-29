@@ -429,6 +429,43 @@ def ingest_vital(vital: VitalRecord):
     return {"patient_id": vital_dict['patient_id'], "risk_score": risk_score, "stored": True}
 
 
+class DemoAlert(BaseModel):
+    patient_id: str
+    level: str  # info | warning | critical
+    text: str
+    bed: Optional[str] = None
+    source: Optional[str] = "demo"  # demo | live-simulated
+
+
+@app.post("/alerts/demo")
+def post_demo_alert(alert: DemoAlert):
+    """Forward a simulation alert to Discord.
+
+    Demo/local browsers must never hold the webhook secret, so they POST
+    here and the backend applies the same per-patient cooldown as live
+    alerts. Messages are always tagged [Demo ...] so a simulated alert can
+    never be mistaken for a real bedside event. Replay sources must NOT
+    use this endpoint (their alerts already flow through /ingest).
+    """
+    level = (alert.level or "").lower()
+    if level not in ("info", "warning", "critical"):
+        raise HTTPException(status_code=422, detail="level must be info|warning|critical")
+    text = (alert.text or "").strip()[:500]
+    if not text:
+        raise HTTPException(status_code=422, detail="text must be non-empty")
+    source = (alert.source or "demo").strip().lower() or "demo"
+    if source not in ("demo", "live-simulated"):
+        raise HTTPException(status_code=422, detail="source must be demo|live-simulated")
+    if not DISCORD_WEBHOOK_URL:
+        return {"sent": False, "reason": "webhook-not-configured"}
+    if not _should_send_patient_alert(f"demo:{alert.patient_id}"):
+        return {"sent": False, "reason": "cooldown"}
+    bed = f" {alert.bed}" if alert.bed else ""
+    message = f"[Demo {level.upper()}] Patient {alert.patient_id}{bed} ({source}): {text}"
+    _ALERT_POOL.submit(send_discord_alert, message)
+    return {"sent": True}
+
+
 @app.get("/patients")
 def get_patients():
     """Return top 6 patients by current risk score."""

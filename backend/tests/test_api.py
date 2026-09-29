@@ -162,3 +162,28 @@ def test_training_artifacts_are_job_scoped():
     j2 = mgr.create_job({'epochs': 1})
     assert j1.job_id != j2.job_id, 'job IDs must be unique'
     assert j1.metrics['train_loss'] is None, 'metrics must be scalars, not lists'
+
+
+def test_demo_alert_validation_and_cooldown():
+    from fastapi.testclient import TestClient
+    import backend.app as app_module
+    client = TestClient(app_module.app)
+    good = {'patient_id': 'demo-test-bed', 'bed': 'ICU-99',
+            'level': 'warning', 'text': 'SpO2 test dip', 'source': 'demo'}
+    r = client.post('/alerts/demo', json=good)
+    assert r.status_code == 200
+    first = r.json()
+    assert set(first) >= {'sent'}
+    # Invalid payloads are rejected, never forwarded.
+    r = client.post('/alerts/demo', json={**good, 'level': 'urgent'})
+    assert r.status_code == 422
+    r = client.post('/alerts/demo', json={**good, 'text': '   '})
+    assert r.status_code == 422
+    r = client.post('/alerts/demo', json={**good, 'source': 'replay'})
+    assert r.status_code == 422
+    # Same alert twice inside the cooldown: at most one send.
+    if first.get('sent') is True:
+        r2 = client.post('/alerts/demo', json=good)
+        assert r2.json() == {'sent': False, 'reason': 'cooldown'}
+    else:
+        assert first.get('reason') == 'webhook-not-configured'

@@ -258,6 +258,36 @@ export default function Dashboard({ theme, onToggleTheme }) {
     return flat
   }, [explainMap])
   const alerts = useMemo(() => buildAlerts(patientQueue, flatExplain), [patientQueue, flatExplain])
+
+  // Demo/live-simulated alerts -> Discord via the backend (POST /alerts/demo).
+  // The browser never holds the webhook secret; the backend applies the same
+  // per-patient cooldown as live alerts and tags every message [Demo ...].
+  // Replay is excluded: its alerts already flow through POST /ingest.
+  const demoAlertSentRef = useRef(new Map())
+  useEffect(() => {
+    if (!backendOnline) return
+    const simulated = demo || (live && liveMeta.simulated)
+    if (!simulated) return
+    const now = Date.now()
+    for (const alert of alerts) {
+      const text = [alert.title, alert.signal || alert.text].filter(Boolean).join(' — ')
+      const key = `${alert.patient_id}|${alert.level}|${text}`
+      if (now - (demoAlertSentRef.current.get(key) || 0) < 120000) continue
+      demoAlertSentRef.current.set(key, now)
+      fetch(`${API_URL}/alerts/demo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: alert.patient_id,
+          bed: alert.bed,
+          level: alert.level,
+          text,
+          source: demo ? 'demo' : 'live-simulated',
+        }),
+      }).catch(() => {})
+    }
+  }, [alerts, backendOnline, demo, live, liveMeta.simulated])
+
   const modelPerf = useMemo(
     () => classificationStats(patientQueue.map((p) => ({ actual: hasDeteriorationEvent(p), predicted: p.risk >= threshold }))),
     [patientQueue, threshold]

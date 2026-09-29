@@ -524,14 +524,19 @@ class RiskScoreEngine:
         with self.lock:
             return self.risk_scores.get(patient_id, 0)
 
-    def get_all_scores(self):
-        """Get all patient risk scores sorted by risk (descending)."""
+    def get_all_scores(self, include_sim=False):
+        """Get all patient risk scores sorted by risk (descending).
+
+        Simulation beds (``sim-`` prefixed keys written by the shared
+        scenario engine) are excluded by default so demo traffic can never
+        surface in real-patient listings like GET /scores.
+        """
         with self.lock:
-            sorted_scores = sorted(
-                self.risk_scores.items(),
-                key=lambda x: x[1],
-                reverse=True
-            )
+            items = self.risk_scores.items()
+            if not include_sim:
+                items = [(pid, score) for pid, score in items
+                         if not str(pid).startswith("sim-")]
+            sorted_scores = sorted(items, key=lambda x: x[1], reverse=True)
             return sorted_scores[:6]  # top 6 patients
 
 

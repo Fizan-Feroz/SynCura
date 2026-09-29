@@ -14,10 +14,13 @@ Restart behaviour (by decision): reseed on boot. No persistence — Render's
 disk is ephemeral.
 
 Divergences from the old browser engine (deliberate, do not "fix" without
-deciding): non-baseline scenarios run hotter drift (DRIFT_GAIN) plus a capped
-risk nudge; displayed risk is the model score when a scorer is attached
-(frontend demo never calls a model); backend waveform keeps 12 points while
-the old frontend kept 6.
+deciding): non-baseline scenarios run slightly hotter drift (DRIFT_GAIN,
+kept modest plus per-bed jitter so beds differentiate instead of pinning
+at the clamp rails); displayed risk is the model score when a scorer is
+attached (frontend demo never calls a model); backend waveform keeps 12
+points while the old frontend kept 6. Labs/GCS ride along anchored near
+population-normal values so the scorer always sees a full 12-feature
+vector; the frontend demo engine mirrors this (see updateDemoBed).
 """
 import logging
 import math
@@ -85,40 +88,40 @@ LAB_BOUNDS = {
 # backend/tests/test_simulation.py asserts parity.
 SEED_PATIENTS = [
     {"patient_id": "33281088", "bed": "ICU-01", "risk": 30,
-     "vitals": {"HR": 74, "SpO2": 96, "Resp": 18, "Temp": 36.8},
+     "vitals": {"HR": 74, "SpO2": 96, "Resp": 18, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "32359580", "bed": "ICU-02", "risk": 40,
-     "vitals": {"HR": 106, "SpO2": 96, "Resp": 23, "Temp": 34.8},
+     "vitals": {"HR": 106, "SpO2": 96, "Resp": 23, "Temp": 34.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [34, 36, 37, 38, 39, 40]},
     {"patient_id": "31316840", "bed": "ICU-03", "risk": 30,
-     "vitals": {"HR": 74, "SpO2": 96, "Resp": 19, "Temp": 36.8},
+     "vitals": {"HR": 74, "SpO2": 96, "Resp": 19, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "38197705", "bed": "ICU-04", "risk": 30,
-     "vitals": {"HR": 100, "SpO2": 96, "Resp": 24, "Temp": 36.8},
+     "vitals": {"HR": 100, "SpO2": 96, "Resp": 24, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "38383343", "bed": "ICU-05", "risk": 30,
-     "vitals": {"HR": 101, "SpO2": 96, "Resp": 19, "Temp": 36.8},
+     "vitals": {"HR": 101, "SpO2": 96, "Resp": 19, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "32128372", "bed": "ICU-06", "risk": 45,
-     "vitals": {"HR": 117, "SpO2": 97, "Resp": 16, "Temp": 36.8},
+     "vitals": {"HR": 117, "SpO2": 97, "Resp": 16, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [39, 41, 42, 43, 44, 45]},
     {"patient_id": "37293400", "bed": "ICU-07", "risk": 30,
-     "vitals": {"HR": 91, "SpO2": 96, "Resp": 20, "Temp": 36.8},
+     "vitals": {"HR": 91, "SpO2": 96, "Resp": 20, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "30932571", "bed": "ICU-08", "risk": 45,
-     "vitals": {"HR": 118, "SpO2": 96, "Resp": 18, "Temp": 36.8},
+     "vitals": {"HR": 118, "SpO2": 96, "Resp": 18, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [39, 41, 42, 43, 44, 45]},
     {"patient_id": "30955999", "bed": "ICU-09", "risk": 45,
-     "vitals": {"HR": 111, "SpO2": 96, "Resp": 26, "Temp": 36.8},
+     "vitals": {"HR": 111, "SpO2": 96, "Resp": 26, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [39, 41, 42, 43, 44, 45]},
     {"patient_id": "32391858", "bed": "ICU-10", "risk": 30,
-     "vitals": {"HR": 89, "SpO2": 96, "Resp": 17, "Temp": 36.8},
+     "vitals": {"HR": 89, "SpO2": 96, "Resp": 17, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "34531557", "bed": "ICU-11", "risk": 30,
-     "vitals": {"HR": 80, "SpO2": 96, "Resp": 18, "Temp": 36.8},
+     "vitals": {"HR": 80, "SpO2": 96, "Resp": 18, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
     {"patient_id": "39635619", "bed": "ICU-12", "risk": 30,
-     "vitals": {"HR": 93, "SpO2": 96, "Resp": 19, "Temp": 36.8},
+     "vitals": {"HR": 93, "SpO2": 96, "Resp": 19, "Temp": 36.8, "GCS": 15, "BUN": 18.0, "Creatinine": 1.0, "WBC": 8.0, "Platelets": 250.0, "Glucose": 110.0},
      "waveform": [24, 26, 27, 28, 29, 30]},
 ]
 
@@ -382,10 +385,17 @@ class SimulationEngine:
                 prev = anchor
             val = prev + _random_centered(self.rng, LAB_NOISE[lab])
             next_vitals[lab] = int(_round_half_up(_clamp(val, lo, hi))) if lab == "GCS" else round(_clamp(val, lo, hi), 1)
+        # Physiology-tracking heuristic (fallback when no scorer): risk is
+        # pulled toward the vitals-implied level each tick instead of
+        # accumulating open-loop drift, which otherwise marches every bed to
+        # the 99 clamp and collapses all differentiation. The small drift
+        # term keeps scenarios visibly distinct; noise stays small so it
+        # cannot drown the signal.
+        implied = _clamp(30 + _score_contributions(next_vitals) * 0.35, 8, 99)
         heuristic = _round_half_up(_clamp(
-            bed["risk"] + combined["riskDrift"] * 0.35
-            + _score_contributions(next_vitals) * 0.05
-            + _random_centered(self.rng, randomizer), 8, 99))
+            bed["risk"] + (implied - bed["risk"]) * 0.3
+            + combined["riskDrift"] * 0.05
+            + _random_centered(self.rng, randomizer * 0.5), 8, 99))
         return {"bed_id": bed["patient_id"], "vitals": next_vitals,
                 "heuristic": heuristic, "now": now,
                 "traj_lead": traj["lead"], "trajectory": bed.get("trajectory"),

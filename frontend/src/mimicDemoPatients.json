@@ -10,7 +10,13 @@
       "HR": 74,
       "SpO2": 96,
       "Resp": 18,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -32,7 +38,13 @@
       "HR": 106,
       "SpO2": 96,
       "Resp": 23,
-      "Temp": 34.8
+      "Temp": 34.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       34,
@@ -54,7 +66,13 @@
       "HR": 74,
       "SpO2": 96,
       "Resp": 19,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -76,7 +94,13 @@
       "HR": 100,
       "SpO2": 96,
       "Resp": 24,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -98,7 +122,13 @@
       "HR": 101,
       "SpO2": 96,
       "Resp": 19,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -120,7 +150,13 @@
       "HR": 117,
       "SpO2": 97,
       "Resp": 16,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       39,
@@ -142,7 +178,13 @@
       "HR": 91,
       "SpO2": 96,
       "Resp": 20,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -164,7 +206,13 @@
       "HR": 118,
       "SpO2": 96,
       "Resp": 18,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       39,
@@ -186,7 +234,13 @@
       "HR": 111,
       "SpO2": 96,
       "Resp": 26,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       39,
@@ -208,7 +262,13 @@
       "HR": 89,
       "SpO2": 96,
       "Resp": 17,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -230,7 +290,13 @@
       "HR": 80,
       "SpO2": 96,
       "Resp": 18,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
@@ -252,7 +318,13 @@
       "HR": 93,
       "SpO2": 96,
       "Resp": 19,
-      "Temp": 36.8
+      "Temp": 36.8,
+      "GCS": 15,
+      "BUN": 18.0,
+      "Creatinine": 1.0,
+      "WBC": 8.0,
+      "Platelets": 250.0,
+      "Glucose": 110.0
     },
     "waveform": [
       24,
