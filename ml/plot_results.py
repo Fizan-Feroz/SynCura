@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-"""Round 25 - produce presentation evidence figures for the DEPLOYED ensemble.
+"""Round 26 - produce presentation evidence figures for the DEPLOYED ensemble.
 
-Replicates backend inference exactly (inference.py): 3 deployed checkpoints
-(s48, c93, s45), logit-averaged, normalized with ml/scaler.json.
+Replicates backend inference exactly (inference.py): v2 manifest trio
+(e12, e13, c53), logit-averaged, each normalized with its own per-member
+scaler. Holdout excludes both locked slices (matches deployed_manifest.json).
 Outputs for the deck:
   ppt/figs/roc.png         ROC curves (val + fresh holdout) with AUC + bootstrap CI
   ppt/figs/metrics_table.png  val/holdout metrics incl. specificity + precision + F1
@@ -55,9 +56,9 @@ def patient_level_auc(y, p, pids):
 from ml.paths import physionet2012_root as _pn_root
 BASE = _pn_root()
 ENS = {
-    "s48": "ml/training_runs/exp_20260916_220047/seed48/model.pt",
-    "c93": "ml/training_runs/exp_20260917_005359/seed93/model.pt",
-    "s45": "ml/training_runs/exp_20260916_213919/seed45/model.pt",
+    "e12": ("ml/models/ensemble/e12.pt", "ml/models/ensemble/e12.scaler.json"),
+    "e13": ("ml/models/ensemble/e13.pt", "ml/models/ensemble/e13.scaler.json"),
+    "c53": ("ml/models/ensemble/c53.pt", "ml/models/ensemble/c53.scaler.json"),
 }
 OUT_DIR = "ppt/figs"
 FEATS = ["HR", "RespRate", "Temp", "SysBP", "DiasBP", "SpO2", "GCS", "BUN",
@@ -65,30 +66,42 @@ FEATS = ["HR", "RespRate", "Temp", "SysBP", "DiasBP", "SpO2", "GCS", "BUN",
 
 
 def load_ensemble(device):
-    models = []
-    for name, path in ENS.items():
+    """(model, mean, std) per member, from the staged deploy checkpoints."""
+    out = []
+    for name, (ckpt, scaler_path) in ENS.items():
         m = AttentionLSTMModel(input_size=12, hidden_size=96, dropout=0.3)
-        m.load_state_dict(torch.load(path, map_location="cpu"))
+        m.load_state_dict(torch.load(ckpt, map_location="cpu"))
         m.eval().to(device)
-        models.append(m)
-    return models
+        sc = json.load(open(scaler_path))
+        out.append((m, np.array(sc["mean"]), np.array(sc["std"])))
+    return out
+
+
+def norm_with(X, mean, std):
+    return ((np.where(np.isnan(X), mean, X) - mean) / std).astype(np.float32)
 
 
 def predict_logits(models, X, device, batch=512):
-    """Logit-averaged ensemble predictions (matches backend/inference.py)."""
+    """Logit-averaged ensemble predictions (matches backend/inference.py).
+
+    models: list of (model, mean, std); each member scores X normalized
+    with its own scaler.
+    """
     out = np.zeros(len(X), dtype=np.float32)
+    Xn = [norm_with(X, mean, std) for _, mean, std in models]
     for off in range(0, len(X), batch):
-        xb = torch.tensor(X[off:off + batch], dtype=torch.float32).to(device)
-        with torch.no_grad():
-            logits = np.mean([m(xb).cpu().numpy().ravel() for m in models], axis=0)
-        out[off:off + len(xb)] = logits
+        parts = []
+        for (m, _, _), Xnm in zip(models, Xn):
+            xb = torch.tensor(Xnm[off:off + batch], dtype=torch.float32).to(device)
+            with torch.no_grad():
+                parts.append(m(xb).cpu().numpy().ravel())
+        out[off:off + len(parts[0])] = np.mean(parts, axis=0)
     return out
 
 
 def normalize(X):
-    sc = json.load(open("ml/scaler.json"))
-    mean, std = np.array(sc["mean"]), np.array(sc["std"])
-    return ((np.where(np.isnan(X), mean, X) - mean) / std).astype(np.float32)
+    _, mean, std = load_ensemble(torch.device("cpu"))[0]
+    return norm_with(X, mean, std)
 
 
 def ci_auc(p, y, n_boot=2000, seed=7):
@@ -110,11 +123,22 @@ def main():
     print("loading data...", flush=True)
     Xva, yva = load_orig_val()
     Xho, yho, hopids = build_fresh_holdout_with_ids()
+    locked = set()
+    import glob as _glob
+    for lock_path in sorted(_glob.glob(os.path.join('ml', 'locked_holdout*.json'))):
+        try:
+            locked |= set(json.load(open(lock_path))['patients'])
+        except Exception:
+            pass
+    if locked:
+        keep = np.array([p not in locked for p in hopids])
+        Xho, yho, hopids = Xho[keep], yho[keep], hopids[keep]
+        print(f'locked excluded from holdout: {len(locked)} patients', flush=True)
     print(f"val {Xva.shape} | fresh holdout {Xho.shape} ({len(np.unique(hopids))} patients)", flush=True)
 
     models = load_ensemble(device)
-    pva = predict_logits(models, normalize(Xva), device)
-    pho = predict_logits(models, normalize(Xho), device)
+    pva = predict_logits(models, Xva, device)
+    pho = predict_logits(models, Xho, device)
     prva = 1 / (1 + np.exp(-np.clip(pva, -30, 30)))
     prho = 1 / (1 + np.exp(-np.clip(pho, -30, 30)))
 
@@ -207,7 +231,7 @@ def main():
             b = x_flat.shape[0]
             x = torch.tensor(x_flat.reshape(b, 90, 12), dtype=torch.float32).to(device)
             with torch.no_grad():
-                logits = torch.stack([m(x).cpu() for m in models]).mean(0)
+                logits = torch.stack([m(x).cpu() for m, _, _ in models]).mean(0)
                 return torch.sigmoid(logits).numpy()
 
         explainer = shap.KernelExplainer(pred_fn, bg.reshape(20, -1))

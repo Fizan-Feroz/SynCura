@@ -7,17 +7,17 @@
 Attention-LSTM that reads 12 vitals/labs over 90 minutes and gives a real-time 0–100 deterioration risk **with explanations** — the papers stop at AUC, we ship the path.
 
 ## Our numbers (memorize)
-- **0.844** fresh 20% set-B holdout AUC (95% CI 0.836–0.852, window-level bootstrap) vs **0.840** validation → consistent, not overfit
+- **0.834** fresh 20% set-B holdout AUC (95% CI 0.825–0.843, window-level bootstrap) vs **0.840** validation → consistent, not overfit
 - Honest caveat: the holdout was unseen by weights but USED during ensemble selection — it is not a locked final test set
 - 2-layer LSTM, hidden 96, additive temporal attention, 12 features, 90-min window, stride 15
 - Ensemble of 3 LSTM models, logit-averaged
 
 ## Training patients (memorize)
 - **Total:** 8,000 (set-a 4,000 + set-b 4,000)
-- **Training:** ~7,000 unique patients combined (s45/s48 trained on set-a only; c93 on set-a + 80% set-b)
+- **Training:** ~7,000 unique patients combined (e12/e13 trained on set-a + 80% set-b; c53 Challenge-2019-warm-started, finetuned on the same E1 set)
 - **Val:** 20% patient split → 0.840
-- **Holdout:** fresh unseen 20% of set-b, ~800 patients → 0.844
-- s45/s48/c93 are just member IDs (training seeds) — same architecture, different data/seed
+- **Holdout:** fresh unseen 20% of set-b excl. locked slices, ~660 patients → 0.834
+- e12/e13/c53 are just member IDs (training seeds) — same architecture, different seed/data-history
 
 ## 12 features (memorize)
 Vitals: HR 60–100 (pump stress) · RespRate 12–20 (breathing trouble) · Temp ~37 (infection) · NISysABP 90–140 (pumping force) · NIDiasABP 60–90 (vessel tone) · SpO2 95–100% (oxygen, most urgent; stored as SaO2 in PhysioNet)
@@ -33,7 +33,7 @@ Line: six fast signals catch the crash, six slow ones explain the cause.
 6. Proposed: rolling 90-min window → risk → temporal-attention + SHAP explanation → dashboard → misses/false alarms queue into weighted retraining + SHAP bar chart
 7. Methodology: 5-box flow (DATA → PREPARE → WINDOW → MODEL → SERVE) + leakage-controls caption
 8. Expected outcome: live dashboard, 0–100 score, explanations, NEWS2 comparison, quantified lead time
-9. Result: 0.840 / **0.844** (95% CI 0.836–0.852) + ROC curve + metrics table (val vs holdout)
+9. Result: 0.840 / **0.834** (95% CI 0.825–0.843) + ROC curve + metrics table (val vs holdout)
 10. Limitations & improvement path: paper 0.936/0.989 hindsight → 0.81/0.76 cross-hospital; stricter-by-design SynCura; scouted upgrades
 11. Tech: PyTorch, FastAPI, React/Vite/Tailwind, SQLite, SHAP + SENSE→INGEST→SCORE→ACT strip
 12. SDG 3 (health) + SDG 9 (innovation)
@@ -62,8 +62,8 @@ Dataset: PhysioNet / Computing in Cardiology Challenge 2012 — https://physione
 - **Why better than papers?** They report AUC; we report false alarms, precision/sensitivity, lead time, NEWS2 comparison + a true unseen holdout.
 - **Does it correct itself?** A: Not live — weights frozen. Mistake-triggered offline loop: confirmed misses/false alarms → weighted retrain → fresh holdout → redeploy.
 - **Is it deployable?** No — research prototype. Needs calibration, prospective testing, external validation, regulatory review.
-- **PhysioNet age?** Known limitation; set-B holdout (0.844) is our honest generalization number.
-- **20 vs 12 features?** 20-feature variant scored worse (0.787 vs 0.807/0.844) — we keep 12.
+- **PhysioNet age?** Known limitation; set-B holdout (0.834) is our honest generalization number.
+- **20 vs 12 features?** 20-feature variant scored worse (0.787 vs 0.807/0.834) — we keep 12.
 - **Hardware?** ESP32 + MAX30105 optional live-vitals extension, not required for the prototype.
 - **Missing vitals?** Population-mean imputation; RealMIP-style recovery is the scouted upgrade.
 
@@ -71,7 +71,7 @@ Dataset: PhysioNet / Computing in Cardiology Challenge 2012 — https://physione
 - **Single dataset** — trained only on PhysioNet 2012; no eICU/MIMIC cross-hospital validation yet.
 - **Data age & scope** — no SpO2 column (mapped to SaO2); population means instead of real missing-data recovery.
 - **Class imbalance** — mortality is rare; handled with loss weighting but affects precision.
-- **Performance not clinical-grade** — 0.844 is strong for a prototype, still short of deployment bar.
+- **Performance not clinical-grade** — 0.834 is strong for a prototype, still short of deployment bar.
 - **No prospective testing** — retrospective data only; no clinical collaborators yet.
 - **Frontend is client-side simulation** — dashboard does not yet read live backend scores (works, but wired to synthetic stream).
 - **Some dashboard stats hardcoded** — model numbers in the UI need manual sync with retrained models.
@@ -83,7 +83,7 @@ If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrad
 ## Pitfalls
 - Don't say "clinical ready" — always "explainable research prototype".
 - Don't compare our numbers to Zheng 2025 (different data/inputs) — say "different scope: 12 vitals vs full EMR".
-- Repeated val gating inflates val AUC — always cite the holdout 0.844 as the honest number.
+- Repeated val gating inflates val AUC — always cite the holdout 0.834 as the honest number.
 
 ## Judges Q&A bank (by rubric, 25 marks)
 
@@ -105,7 +105,7 @@ If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrad
 ### 3. NOVELTY (4 marks)
 - **Q: What is novel if LSTM exists?** A: Integration novelty, not architecture novelty: temporal attention + real-time FastAPI serving + React dashboard + dual explainability (attention for when, SHAP for what) in one prototype.
 - **Q: Papers report AUC — what do you add?** A: False alarms, sensitivity/specificity/precision, lead-time estimate, NEWS2>=7 inline comparison, threshold slider, calibration path — the decision metrics clinicians need.
-- **Q: Proof against overfitting?** A: Fresh 20% set-B holdout 0.844 (95% CI 0.836–0.852, window-level) consistent with validation 0.840 — no major overfit. Caveat: the holdout guided ensemble selection, so it is not a locked final test. (Full set-b N/A since c93 trained on 80% of set-b.)
+- **Q: Proof against overfitting?** A: Fresh 20% set-B holdout 0.834 (95% CI 0.825–0.843, window-level) consistent with validation 0.840 — no major overfit. Caveat: the holdout guided ensemble selection, so it is not a locked final test. (Full set-b N/A since members trained on 80% of set-b.)
 - **Q: Why attention + SHAP both?** A: Attention = which minutes mattered; SHAP = which features mattered. Per-patient inspectable on dashboard.
 - **Q: Why is 90-min window novel vs base?** A: Base uses full stay till discharge; we force early-warning conditions — recent window only, deployable streaming.
 
@@ -113,9 +113,9 @@ If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrad
 - **Q: Dataset and features?** A: PhysioNet 2012, 4,000 train + 4,000 holdout; 12 features (HR, RespRate, Temp, NISysABP, NIDiasABP, SpO2→SaO2 mapped + GCS, BUN, Creatinine, WBC, Platelets, Glucose).
 - **Q: SpO2 mapping valid?** A: PhysioNet 2012 has SaO2 not SpO2; same units (%), arterial gold standard — slot stays named SpO2 so train/inference/frontend match.
 - **Q: Leakage controls?** A: Train-only population z-score, patient-level GroupShuffleSplit, proximity labeling (last 12h), holdout never touched.
-- **Q: Why 12 not 20 features?** A: Tested — 20-feature variant scored worse (0.787 vs 0.844). Keep 12.
+- **Q: Why 12 not 20 features?** A: Tested — 20-feature variant scored worse (0.787 vs 0.834). Keep 12.
 - **Q: Model size / speed?** A: 2-layer LSTM h96, dropout 0.3, ~lightweight; thread-safe RiskScoreEngine, 0–100 score per ingest; runs on CPU.
-- **Q: Why ensemble of 3?** A: Logit-averaged, greedy holdout-gated selection; ensemble beats single seeds and holdout>val shows stability.
+- **Q: Why ensemble of 3?** A: Logit-averaged, greedy holdout-gated selection across two training families; ensemble beats single seeds and the cross-family mix adds diversity single-family ensembles lacked.
 - **Q: Missing vitals live?** A: Interpolation + population-mean fill now; RealMIP-style generative recovery scouted.
 - **Q: Frontend — real or fake?** A: Honest answer: dashboard runs on synthetic scenario stream (5 scenarios); backend replay path with real PhysioNet data exists via /ingest. Full wiring is future work.
 - **Q: Calibration / thresholds?** A: Threshold slider live-tunes sensitivity/specificity/false alarms; decision-curve analysis + prospective pilot are the stated next steps.
@@ -124,15 +124,15 @@ If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrad
 ### 5. PPT (3 marks)
 - **Q: Why base vs supporting split on slide 4?** A: Base = adapted architecture+task (Zheng 2025); supporting = targets, bounds, methods, contrast.
 - **Q: References slide?** A: Zheng as [1] with full title, 8 supporting papers with full citations, PhysioNet dataset. No ellipsis, no truncation.
-- **Q: Report says 0.837/0.807 but slides say 0.840/0.844?** A: Synced — report, README, and AGENTS now describe the deployed 3-model ensemble (val 0.840, fresh holdout 0.844); 0.837/0.807 kept as previous-milestone row.
+- **Q: Report says 0.837/0.807 but slides say 0.840/0.834?** A: Synced — report, README, and AGENTS now describe the deployed 3-model ensemble (val 0.840, fresh holdout 0.834); 0.837/0.807 kept as previous-milestone row.
 
 ### 6. PARTICIPATION (3 marks)
 - **Q: Who did what?** A: Fizan Feroz — ML pipeline + backend; teammates — frontend + integration. Each member owns: one can demo dashboard scenarios, one can explain attention/SHAP output, one can defend metrics/holdout.
 - **Q: Equal contribution?** A: Show commits across ml/, backend/, frontend/; rehearse handoffs per slide.
 
 ### 7. QUESTIONS / DEFENSE (3 marks)
-- **Q: Is 0.844 clinically enough?** A: Strong prototype, not deployment bar. Field range for vitals-only is 0.70–0.85; Wu upper bound 0.926. Needs calibration + prospective validation.
-- **Q: Why PhysioNet 2012, not MIMIC-IV?** A: Public, reproducible, established benchmark; age acknowledged; eICU/MIMIC validation is slide-10 path.
+- **Q: Is 0.834 clinically enough?** A: Strong prototype, not deployment bar. Field range for vitals-only is 0.70–0.85; Wu upper bound 0.926. Needs calibration + prospective validation.
+- **Q: Why PhysioNet 2012, not MIMIC-IV?** A: Public, reproducible, established benchmark; age acknowledged; eICU/MIMIC validation needs credentialed access (out of current 2012+2019 scope).
 - **Q: Lead time — how measured?** A: Average early-warning hours vs NEWS2>=7 crossing on dashboard analytics; must be measured properly, not assumed.
 - **Q: Biggest limitation in one line?** A: Single retrospective dataset, no cross-hospital or prospective evidence — every limit has a named upgrade on slide 10.
-- **Q: Six more months?** A: eICU/MIMIC external validation, RealMIP imputation, time-aware attention, prospective pilot with decision curves.
+- **Q: Six more months?** A: Credentialed eICU/MIMIC access for external validation, RealMIP imputation, time-aware attention, prospective pilot with decision curves.

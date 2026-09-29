@@ -7,23 +7,25 @@
 
 ## Results (deployed model)
 
-3-model logit-averaged ensemble (`s48 + c93 + s45`, 12 features, 90-min windows), per `ml/deployed_manifest.json` and `ppt/figs/metrics.json`:
+3-model logit-averaged ensemble (`e12 + e13 + c53`: two E1 causal seeds + one Challenge-2019-warm-started seed finetuned on the E1 set; 12 features, 90-min windows), per `ml/deployed_manifest.json` and `ppt/figs/metrics.json`:
 
 | Split | AUC | Accuracy | Sensitivity | Specificity | Precision | F1 |
 |---|---|---|---|---|---|---|
-| Validation | **0.840** | 0.738 | 0.816 | 0.724 | 0.357 | 0.496 |
-| Fresh unseen 20% set-B holdout | **0.844** (95% CI 0.836–0.852) | 0.747 | 0.807 | 0.737 | 0.345 | 0.483 |
+| Validation | **0.840** | 0.743 | 0.762 | 0.739 | 0.354 | 0.484 |
+| Fresh unseen 20% set-B holdout | **0.834** (95% CI 0.825–0.843) | 0.759 | 0.803 | 0.752 | 0.351 | 0.488 |
 
 **Read these numbers honestly:**
-- `c93` trained on set-a + 80% of set-b, so full set-b evaluation is N/A; the 20% set-b holdout was unseen by weights but used during ensemble selection — not a locked final test.
+- All members trained on set-a + 80% of set-b (excl. val + locked slices), so full set-b evaluation is N/A; the 20% set-b holdout was unseen by weights but used during ensemble selection — not a locked final test.
 - The CI is a window-level bootstrap.
 - Repeated gating on the same validation split makes validation AUC optimistic — keep the holdout gate on every deploy decision.
 - `ml/dataset.py` uses causal per-window interpolation (no future leakage). Checkpoints trained before that fix must be retrained for comparable numbers.
+- One-time locked-slice evals (never trained/selected on): locked-A 0.828, locked-B 0.818 — the paper/report numbers.
+- Operating point: at decision threshold 0.7, precision ≈ 0.50 at recall ≈ 0.48 (val).
 
 ## Release
 
 - Website: **v1.11.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
-- Deployed model: `syncura-attention-lstm-ensemble-v1`, per `ml/deployed_manifest.json`.
+- Deployed model: `syncura-attention-lstm-ensemble-v2`, per `ml/deployed_manifest.json`.
 - Deployment check: `GET /version` reports the backend’s website version, model, and git commit.
 - Training UI is internal-only: public builds hide it unless built with `VITE_ENABLE_TRAINING=true`.
 - Data sources (dashboard toggle): `Backend live` (shared scenario engine — every visitor sees the same beds), `Replay` (whatever the backend ingested), and `Demo` (local-only engine for demos; this browser only, nothing synced or sent).

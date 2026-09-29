@@ -16,7 +16,7 @@ Time-aware bidirectional attention-based LSTM (TBAL) on 176,344 ICU stays (MIMIC
 
 ### Abstract
 
-Intensive Care Unit (ICU) patient deterioration remains a leading cause of preventable in-hospital mortality. Traditional scoring systems like NEWS2 rely on static thresholds and fail to capture temporal trends in physiological data. This project presents **SynCura**, a real-time ICU monitoring system that uses an Attention-based Long Short-Term Memory (LSTM) network to predict patient deterioration risk from continuous vital sign streams. The system integrates a FastAPI backend for real-time inference, a React dashboard for clinical visualization, and SHAP-based explainability for transparent, interpretable predictions. Trained and evaluated on the PhysioNet 2012 Challenge dataset, the deployed model uses 12 features (6 vitals: Heart Rate, Respiratory Rate, Temperature, Systolic/Diastolic Blood Pressure, SpO2 + 6 labs/neuro: GCS, BUN, Creatinine, WBC, Platelets, Glucose) with a 90-minute sliding window. The target is **in-hospital mortality** (`In-hospital_death` labels; reported as mortality risk, not a validated deterioration/sepsis predictor). The attention mechanism enables per-timestep interpretability, identifying which moments in a patient's trajectory most influenced the risk prediction. Deployed: 3-model logit-averaged ensemble (hidden 96), val AUC 0.840, fresh 20%-set-B holdout AUC 0.844 (holdout used during ensemble selection, not a locked final test).
+Intensive Care Unit (ICU) patient deterioration remains a leading cause of preventable in-hospital mortality. Traditional scoring systems like NEWS2 rely on static thresholds and fail to capture temporal trends in physiological data. This project presents **SynCura**, a real-time ICU monitoring system that uses an Attention-based Long Short-Term Memory (LSTM) network to predict patient deterioration risk from continuous vital sign streams. The system integrates a FastAPI backend for real-time inference, a React dashboard for clinical visualization, and SHAP-based explainability for transparent, interpretable predictions. Trained and evaluated on the PhysioNet 2012 Challenge dataset, the deployed model uses 12 features (6 vitals: Heart Rate, Respiratory Rate, Temperature, Systolic/Diastolic Blood Pressure, SpO2 + 6 labs/neuro: GCS, BUN, Creatinine, WBC, Platelets, Glucose) with a 90-minute sliding window. The target is **in-hospital mortality** (`In-hospital_death` labels; reported as mortality risk, not a validated deterioration/sepsis predictor). The attention mechanism enables per-timestep interpretability, identifying which moments in a patient's trajectory most influenced the risk prediction. Deployed: 3-model logit-averaged ensemble v2 (hidden 96; two E1 causal seeds + one Challenge-2019-warm-started seed), val AUC 0.840, fresh 20%-set-B holdout AUC 0.834 (holdout used during ensemble selection, not a locked final test; one-time locked evals: 0.828/0.818).
 
 ---
 
@@ -172,7 +172,7 @@ Key design choices:
 - **Early Stopping**: Patience=14 epochs on validation AUC
 - **Min Delta**: 0.0005 AUC improvement required
 - **Data**: Full PhysioNet set-a (4,000 patients, stride-30 windows) minus the 20% validation cohort; evaluated on the original stride-15 split + fresh unseen 20% set-b holdout
-- **Deployment**: 3-model logit-averaged ensemble `s48 + c93 + s45` (mixed old + combo training; `c93` trained on set-a + 80% set-b, so the honest external number is the fresh unseen 20% set-b holdout, not the full set-b)
+- **Deployment**: 3-model logit-averaged ensemble `e12 + e13 + c53` (cross-family greedy: two E1 causal seeds + one Challenge-2019-warm-started seed finetuned on the E1 set; all members trained on set-a + 80% set-b excl. val/locked, so the honest external number is the fresh unseen 20% set-b holdout, not the full set-b)
 
 ---
 
@@ -256,16 +256,16 @@ After training with AttentionLSTM + early stopping:
 | + Step-decay LR (multi-seed) | 12 features, w=90, h=96 | 0.807 | 0.765 |
 | + Full set-a training (3200 patients) | 12 features, w=90, h=96 | **0.833** | **0.806** |
 | + 4-model logit ensemble (greedy, holdout-gated) | 12 features, w=90, h=96 x4 | **0.837** | **0.807** |
-| + Mixed old+combo ensemble (set-b distribution training) | 12 features, w=90, h=96 x3 | **0.840** | **0.844** (fresh unseen 20% set-b) |
+| + Cross-family ensemble (E1 + C19-finetune, greedy val-gated) | 12 features, w=90, h=96 x3 | **0.840** | **0.834** (fresh unseen 20% set-b excl. locked) |
 
 The deployed model is a 3-member logit-averaged ensemble
-(`s48 + c93 + s45`, all 12 features, w=90, h=96) served by
+(`e12 + e13 + c53`, all 12 features, w=90, h=96) served by
 `backend/inference.py` multi-checkpoint support (`ml/models/ensemble/*.pt`).
-Val AUC 0.840 on the original stride-15 split. `c93` was trained on combined
-set-a + 80% of set-b (~7000 patients); the honest external number is the fresh
-holdout of fully unseen set-b patients: AUC 0.844. Bidirectional, 20-feature,
-time-gap-channel, and 24h-horizon variants were all tested and did not beat
-the ensemble (details in `ml/training_runs/`).
+Val AUC 0.840 on the original stride-15 split. Members were trained on combined
+set-a + 80% of set-b excl. val/locked (~7000 patients); the honest external number is the fresh
+holdout of fully unseen set-b patients: AUC 0.834. Bidirectional, 20-feature,
+time-gap-channel, 24h-horizon, Challenge-2019 pretraining, and multi-task variants were all tested and did not beat
+the ensemble as singles (details in `ml/training_runs/`).
 
 #### 6.2 Comparison with NEWS2
 
@@ -402,7 +402,7 @@ PROJ/
 │   ├── sweep_*.py             # Experiment sweeps (rounds 8-17)
 │   ├── pick_ensemble.py       # Greedy holdout-gated ensemble selection
 │   ├── ensemble_best.json     # Deployed ensemble manifest
- │   ├── metrics.json           # Deployed metrics (val AUC 0.840, fresh holdout 0.844)
+ │   ├── metrics.json           # Deployed metrics (val AUC 0.840, fresh holdout 0.834)
  │   ├── scaler.json            # Population normalization stats (12 features)
  │   └── models/                # lstm_baseline.pt + ensemble/*.pt (3 members)
 ├── backend/
@@ -459,15 +459,14 @@ POST /ingest
 ```json
 GET /metrics
 {
-  "config": "ensemble-s48+c93+s45",
-  "val_auc": 0.8401,
-  "val_accuracy": 0.7384,
-  "val_recall": 0.816,
-  "fresh_holdout_auc": 0.8441,
-  "fresh_holdout_accuracy": 0.7471,
-  "fresh_holdout_recall": 0.8066
+  "auc": 0.8275,
+  "accuracy": 0.7698,
+  "recall": 0.7734,
+  "precision": 0.3144,
+  "auc_source": "locked-once"
 }
 ```
+Mapped from `ml/metrics.json`: `locked_*` (one-time eval, never trained/selected on) takes precedence; falls back to fresh-holdout, then val. Full candidate + serving provenance is included in the response.
 
 **Explain Patient:**
 ```json

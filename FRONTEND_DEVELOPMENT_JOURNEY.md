@@ -245,7 +245,7 @@ Training views use the backend directly for job creation, job status, and metric
 
 ### Offline Model Metrics
 
-The model snapshot requests `/metrics` when the dashboard mounts. The landing and architecture pages also present verified offline evaluation information, including the current research result of 0.844 holdout AUC with its stated limitations.
+The model snapshot requests `/metrics` when the dashboard mounts. The landing and architecture pages also present verified offline evaluation information, including the current research result of 0.834 holdout AUC (v2 ensemble; val 0.840) with its stated limitations.
 
 The holdout was used during ensemble selection and is not a locked final test set. It should continue to be described as a research evaluation result, not clinical validation or prospective evidence.
 

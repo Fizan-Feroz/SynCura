@@ -1,8 +1,8 @@
 {
-  "config": "campaign-winner-E1-seed12+seed13 (CANDIDATE, not deployed)",
+  "config": "xfamily-trio E1/seed13 + c19/seed53 + E1/seed12 (CANDIDATE, deployed as v2 2026-09-30)",
   "serving": {
-    "config": "ensemble-s48+c93+s45 (pre-fix, leaky pipeline; contaminated holdout)",
-    "note": "Still loaded by backend/inference.py. Winner below NOT yet promoted; promotion needs review."
+    "config": "syncura-attention-lstm-ensemble-v2 (e12+e13+c53, causal pipeline)",
+    "note": "Loaded by backend/inference.py via ml/deployed_manifest.json. Val 0.8404 / fresh holdout 0.8338. Previous v1 (s48+c93+s45, pre-fix leaky) preserved at ml/deployed_manifest.v1.json."
   },
   "members": [
     "improve_baseline_E1/seed13",

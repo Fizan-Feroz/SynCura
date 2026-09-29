@@ -2,13 +2,10 @@
 
 ## Where we stand
 
-- Deployed: 3-model ensemble (s48+c93+s45), val AUC **0.840**, fresh 20%-set-B holdout **0.844**.
-- Problem: those checkpoints were trained with **whole-stay interpolation** (`ml/dataset.py`
-  interpolated the full 48h record before slicing windows), so early windows could see future
-  measurements. The audit fixed `ml/dataset.py` to interpolate **causally within each window**.
-- Consequence: the 0.840/0.844 numbers are **not comparable** to anything trained after the fix.
-  Step E1 re-establishes the honest baseline. Expect it to land **slightly lower** (typical cost
-  of removing leakage: 0.005–0.02 AUC).
+- Deployed: 3-model ensemble v2 (`e12+e13+c53`: two E1 causal seeds + one Challenge-2019-warm-started seed finetuned on the E1 set), val AUC **0.840**, fresh 20%-set-B holdout **0.834** (excl. locked slices; manifest in `ml/deployed_manifest.json`, figures regenerated via `ml/plot_results.py`).
+- Retired: v1 (`s48+c93+s45`, val 0.840 / holdout 0.844) was trained with **whole-stay interpolation**, so its numbers are not comparable to anything causal. Preserved at `ml/deployed_manifest.v1.json` for history.
+- Rounds 1–3 verdict (20+ seeds, 8 config families on PhysioNet 2012 + Challenge 2019 only, per scope): every single-model variant converges to ~0.82 locked (locked-A 0.828, locked-B 0.818). C19 pretraining and multi-task joint training showed zero-to-negative transfer as singles; only cross-family ensemble diversity moved the needle (+0.005 to honest 0.840). GRU-D (E2c, seeds 26/27) in flight; ATE loss deliberately skipped (needs the paper's causal-discovery machinery).
+- Consequence: the 0.840/0.844 v1 numbers are **not comparable** to anything trained after the fix.
 
 ## The #1 bet: gap (time-since-observation) channels
 
@@ -45,7 +42,7 @@ Fresh holdout = 20% set-b patients (seed 123) — reported, and used as a promot
 
 ## Promotion gates (all must hold)
 
-1. Candidate val AUC > current deployed val (0.8401 after E1 re-baselines to the new number).
+1. Candidate val AUC > current deployed val (0.8404).
 2. Fresh holdout AUC ≥ 0.83 (no collapse off-distribution).
 3. Config is streaming-servable: forward-only, causal, input contract documented.
 4. `ml/plot_results.py` regenerated: ROC + metrics table + patient-level AUC + Brier/ECE.

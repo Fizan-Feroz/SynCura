@@ -23,7 +23,7 @@ python ml/train.py `
 #   data\predicting-...-2012-1.0.0\predicting-...-2012-1.0.0\set-b_full\set-b  = 4000 patients (set-b, use as holdout)
 #   Outcomes-a.txt = labels (4000 rows), Outcomes-b.txt = set-b labels (4000 rows)
 
-# Latest full-training sweep (best: 3-model mixed ensemble s48+c93+s45, val AUC 0.840, fresh holdout 0.844)
+# Latest: cross-family greedy ensemble e12+e13+c53 (val AUC 0.840, fresh holdout 0.834), deployed as ensemble-v2
 python -m ml.sweep_xval       # full set-a vs original val split (round 15, best single 0.833)
 python -m ml.pick_ensemble    # greedy holdout-gated ensemble selection (round 18)
 
@@ -75,7 +75,7 @@ PROJ/
 │   ├── deployed_manifest.json   # SERVED ensemble: members, checkpoints, features, AUC, threshold
 │   ├── ensemble_best.json       # Ensemble selection manifest (members, checkpoints, metrics)
 │   ├── requirements.txt         # numpy, pandas, scikit-learn, torch, shap, matplotlib
-│   ├── models/                  # Scratch weights GITIGNORED; ensemble/{s48,c93,s45}.pt TRACKED for deploy
+│   ├── models/                  # Scratch weights GITIGNORED; ensemble/{e12,e13,c53}.pt TRACKED for deploy (v2; v1 s48/c93/s45 retired)
 │   └── training_runs/           # Timestamped training run outputs (metrics.json only)
 │
 ├── backend/                     # FastAPI REST API
@@ -159,11 +159,11 @@ Patient Vitals --> [Backend /ingest] --> [SQLite DB]
 - Adam optimizer, weight_decay=1e-4, lr=1e-4 halved every 6 epochs (step decay)
 - Trains on population-normalized inputs using `ml/scaler.json` stats (train-split only)
 
-**Current best (deployed, commit ec9c129):**
-- 3-model logit-averaged ensemble `s48 + c93 + s45` (all 12 features, w=90, h=96), served from `ml/models/ensemble/*.pt` via multi-checkpoint support in `backend/inference.py`
-- **Val AUC 0.840** (original stride-15 80/20 split), **fresh holdout AUC 0.844** (unseen 20% set-b; full set-b holdout N/A since `c93` trained on 80% of set-b)
-- Ensemble picked by mixed greedy old+combo selection (`ml/pick_ensemble2.py`, manifest in `ml/ensemble_best.json`)
-- Previous milestones: 0.837/0.807 4-model (holdout-gated); 0.833/0.806 single (full set-a training); 0.807/0.765 (1519-patient training)
+**Current best (deployed ensemble-v2):**
+- 3-model logit-averaged ensemble `e12 + e13 + c53` (all 12 features, w=90, h=96; two E1 causal seeds + one Challenge-2019-warm-started seed finetuned on the E1 set), served from `ml/models/ensemble/*.pt` via multi-checkpoint support in `backend/inference.py`
+- **Val AUC 0.840** (original stride-15 80/20 split), **fresh holdout AUC 0.834** (unseen 20% set-b excl. locked; full set-b holdout N/A since members trained on 80% of set-b)
+- Ensemble picked by cross-family greedy val-gated selection over E1 + C19-finetune seeds (`ml/training_runs/xfamily_mega.json`, manifest in `ml/deployed_manifest.json`); C19 warm-start ships with recorded user sign-off (registry clears challenge2019 for train, not deploy_train)
+- Previous milestones: 0.835/0.837 E1 pair (causal); 0.840/0.844 v1 (pre-fix leaky pipeline, retired); 0.837/0.807 4-model (holdout-gated); 0.833/0.806 single (full set-a training); 0.807/0.765 (1519-patient training)
 
 ## Key API Endpoints
 
@@ -253,10 +253,10 @@ npm run build     # catches broken imports and CSS ordering
 - Test suite: `backend/tests/` — run `python -m pytest backend/tests/ -q` from the repo root (CI runs it plus the frontend build)
 - `chart.js` and `socket.io-client` were removed from `frontend/package.json` in the redesign; do not reintroduce them, the UI draws SVG traces directly
 - `ml/models/*.pt` is gitignored, so scratch checkpoints need `git add -f`. The deployed
-  ensemble `ml/models/ensemble/{s48,c93,s45}.pt` is tracked on purpose (Render boots from it,
+  ensemble `ml/models/ensemble/{e12,e13,c53}.pt` is tracked on purpose (Render boots from it,
   no retraining) — update those files and `ml/deployed_manifest.json` together.
 - Full set-a (4000 patients) training is ~5-7 min/epoch at stride 15; use stride 30 (~2-3 min/epoch) for sweeps — deployment uses window 90 regardless of training stride
 - When comparing runs: the 0.807/0.833/0.837 numbers all use the ORIGINAL 1519-subset 80/20 stride-15
   val split (seed 42); full-set-a sweeps that use a different split are NOT directly comparable. Deployed val is 0.840 on that same split.
-- Honest generalization number is the fresh unseen 20% set-b holdout (currently 0.844); repeated gating on the same
+- Honest generalization number is the fresh unseen 20% set-b holdout (currently 0.834); repeated gating on the same
   val split makes val AUC optimistic — keep the holdout gate on every deploy decision

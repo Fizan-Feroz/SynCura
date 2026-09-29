@@ -13,7 +13,7 @@ This file is the up-to-date orientation doc. `AGENTS.md` also exists but describ
 - **12 features**, **90-minute window**, config name `f12-h96-w90` (12 features, hidden=96, window=90).
 - Features: `HR, RespRate, Temp, NISysABP, NIDiasABP, SpO2, GCS, BUN, Creatinine, WBC, Platelets, Glucose`.
 - Headline (one-time locked holdout, never trained/selected on): AUC **0.828**, accuracy 0.770, recall 0.773, precision 0.314 — see `ml/LOCKED_EVAL_20260926.json`.
-- Deployed ensemble `s48+c93+s45` (`ml/deployed_manifest.json`): val 0.840, fresh holdout 0.844 — but the holdout guided ensemble selection, so treat those as optimistic; the locked number above is the honest one.
+- Deployed ensemble `e12+e13+c53` (`ml/deployed_manifest.json`, v2): val 0.840, fresh holdout 0.834 — but the holdout guided ensemble selection, so treat those as optimistic; the locked number above is the honest one.
 - Got here via iterative grid search (30+ configs, 25+ rounds) — see `ml/RESULTS_PLAN.md` for the full story:
   6→12 features, window 60→90, hidden 64→96, population normalization, proximity labeling, SaO2→SpO2 alias.
 - `ml/scaler.json` holds the population mean/std from the training split — inference must use these,

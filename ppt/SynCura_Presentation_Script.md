@@ -58,7 +58,7 @@ SynCura is an attention-based LSTM over a rolling 90-minute window of 12 clinica
 
 It returns a 0-to-100 risk score with two explanations: temporal attention for influential time steps, SHAP for influential features.
 
-Three differences from the literature: we report false alarms, sensitivity, specificity, precision, lead time, and a NEWS2 comparison instead of AUC only; our fresh unseen 20% set-B holdout AUC of 0.844 exceeds the 0.840 validation; and we ship an end-to-end FastAPI path with alerts and HTTP/MQTT ingestion, not just a trained model.
+Three differences from the literature: we report false alarms, sensitivity, specificity, precision, lead time, and a NEWS2 comparison instead of AUC only; our fresh unseen 20% set-B holdout AUC of 0.834 sits just under the 0.840 validation, inside the confidence interval; and we ship an end-to-end FastAPI path with alerts and HTTP/MQTT ingestion, not just a trained model.
 
 Fourth, SynCura is designed to learn from its mistakes. Every confirmed miss and false alarm is queued, clinician-reviewed, and weighted into the next offline retrain — so each version fails less where the last one did. We never patch weights on a single live case: the mistake triggers the lesson, batches teach it, and a fresh holdout re-validates it.
 
@@ -80,9 +80,9 @@ The goal is a feasible, explainable research prototype — not clinical deployme
 
 ## Slide 9: Experimental Result
 
-Our deployed ensemble achieves 0.840 validation AUC and **0.844 on the fresh unseen 20% set-B holdout**. Holdout at or above validation suggests no major overfitting — confidence intervals and repeated runs are still pending, so we state it cautiously. (Full set-b holdout is N/A because member c93 trained on 80% of set-b.)
+Our deployed ensemble achieves 0.840 validation AUC and **0.834 on the fresh unseen 20% set-B holdout**. Holdout just under validation but inside the 95% CI (0.825–0.843) suggests no major overfitting — we state it cautiously. (Full set-b holdout is N/A because members trained on 80% of set-b.)
 
-Point at the figure: the ROC curve reproduced from the deployed checkpoints gives val AUC 0.840, and the confusion matrix at threshold 0.5 shows 1,880 caught deaths against 424 missed — recall 0.816. That is the number a clinician cares about.
+Point at the figure: the ROC curve reproduced from the deployed checkpoints gives val AUC 0.840, and the confusion matrix at threshold 0.5 shows recall 0.762 at precision 0.354. That recall-precision trade is the number a clinician cares about.
 
 Beyond AUC we report sensitivity, specificity, precision, false-alarm count, and lead-time estimate, benchmarked against NEWS2.
 
@@ -96,7 +96,7 @@ First, paper versus reality: base reports 0.936 overall and 0.989 at discharge �
 
 Second, reality is messier: US-only retrospective data, missing and asynchronous vitals, age bias above 65, single-center MIMIC data.
 
-Third, SynCura is stricter: 90-minute window only, no future or discharge info, holdout 0.844 over validation 0.840.
+Third, SynCura is stricter: 90-minute window only, no future or discharge info, holdout 0.834 just under validation 0.840 but inside the CI.
 
 Fourth, we report what papers skip: false alarms, precision, lead time versus NEWS2, calibration.
 
@@ -116,7 +116,7 @@ Pure forward roadmap, no overlap with slide 10: calibration plus decision-curve 
 
 ## Slide 14: Conclusion
 
-SynCura demonstrates an end-to-end explainable ICU risk-monitoring workflow from time-series input to dashboard output. Temporal attention plus SHAP show which time steps and features drove each prediction. The ensemble reached 0.840 validation and 0.844 holdout AUC — supporting the prototype concept while requiring external and clinical validation before real-world use.
+SynCura demonstrates an end-to-end explainable ICU risk-monitoring workflow from time-series input to dashboard output. Temporal attention plus SHAP show which time steps and features drove each prediction. The ensemble reached 0.840 validation and 0.834 holdout AUC — supporting the prototype concept while requiring external and clinical validation before real-world use.
 
 ## Slide 15: References
 
@@ -164,7 +164,7 @@ Single public dataset, missing/irregular measurements, no external validation ye
 
 ### How does SynCura compare with reviewed papers?
 
-Papers optimize AUC; SynCura optimizes the path from data to decision — false alarms, sensitivity, specificity, precision, lead time, NEWS2 comparison, unseen holdout 0.844 over 0.840 validation.
+Papers optimize AUC; SynCura optimizes the path from data to decision — false alarms, sensitivity, specificity, precision, lead time, NEWS2 comparison, unseen holdout 0.834 alongside 0.840 validation.
 
 ### What would make SynCura better with more time?
 

@@ -72,7 +72,7 @@ Anchors: 6 → "90 minutes in, 0–100 out, two explanations" | 7 → "interpola
 >
 > *(pause)*
 >
-> ...and we report **two** numbers. **Validation AUC: 0.840.** And more importantly — a **fresh holdout (20% of set-B patients, never in training): AUC 0.844, 95% CI 0.836–0.852.** One honest caveat: that holdout guided our ensemble choice, so it is not a locked final test — the next step is a truly untouched multi-hospital set.
+> ...and we report **two** numbers. **Validation AUC: 0.840.** And more importantly — a **fresh holdout (20% of set-B patients, never in training): AUC 0.834, 95% CI 0.825–0.843.** One honest caveat: that holdout guided our ensemble choice, so it is not a locked final test — the next step is a truly untouched multi-hospital set.
 >
 > *(pause)*
 >
@@ -80,7 +80,7 @@ Anchors: 6 → "90 minutes in, 0–100 out, two explanations" | 7 → "interpola
 >
 > *Point at the ROC curve:* "The two curves almost overlap — validation and unseen holdout track each other. That's what you want to see."
 
-Delivery: pause *before* "0.844", point at the number, say "ensemble of three" clearly.
+Delivery: pause *before* "0.834", point at the number, say "ensemble of three" clearly.
 
 ## Step 6a — Slide 10: Limitations & Improvement Path (30s)
 
@@ -125,27 +125,27 @@ Anchor: "validate → recover missing data → test live."
 Simple stage line: *"Three models, same brain shape, different schooling — they vote, and the average wins."*
 
 ### "Why does holdout beat validation?" (general, no numbers)
-> "Validation is a number we watched while still tuning — the model slightly peeked. The holdout is the untouched final exam — run once, never tuned on. Averaging three models makes the prediction steadier — quirky mistakes cancel out — and the result is consistent across both splits (0.840 vs 0.844 with 95% CI 0.836–0.852)."
+> "Validation is a number we watched while still tuning — the model slightly peeked. The holdout is the untouched final exam — run once, never tuned on. Averaging three models makes the prediction steadier — quirky mistakes cancel out — and the result is consistent across both splits (0.840 vs 0.834 with 95% CI 0.825–0.843)."
 
 ---
 
 ## Q&A 3-rule rap
 
 1. **Pause 2 seconds** before answering.
-2. **Anchor to your numbers:** performance → 0.844 holdout; better than papers → metrics beyond AUC + true holdout; deployable → research prototype, needs calibration/prospective.
+2. **Anchor to your numbers:** performance → 0.834 holdout; better than papers → metrics beyond AUC + true holdout; deployable → research prototype, needs calibration/prospective.
 3. Unsure → *"We haven't tested that yet — it's in our scoped next steps on slide 10."*
 
 Likely traps & answers:
-- *"0.844 vs the field?"* → "For a 12-vital, single-dataset system, yes — realistic range is 0.78–0.93. Zheng's 0.936 uses the full medical record."
+- *"0.834 vs the field?"* → "For a 12-vital, single-dataset system, yes — realistic range is 0.78–0.93. Zheng's 0.936 uses the full medical record."
 - *"Why not BiLSTM like Zheng?"* → "Bidirectional needs the full sequence; we score live streaming, so forward LSTM is the latency trade-off."
 - *"Why 12 features?"* → "A 20-feature variant scored worse (0.787) — 12 wins."
 - *"Is it clinically ready?"* → "No — explainable research prototype. Needs calibration, external validation, prospective testing, regulatory review."
 
 ## Mandatory numbers (on a sticky on the laptop lid)
 
-**844** (holdout, CI 0.836–0.852) • **840** (val) • **12 × 90min / stride 15**
+**844** (holdout, CI 0.825–0.843) • **840** (val) • **12 × 90min / stride 15**
 
 ## House rules (don't break)
 - Never "clinical ready" → always "explainable research prototype."
-- Never quote validation alone → always holdout 0.844.
+- Never quote validation alone → always holdout 0.834.
 - Never cross-compare to Zheng → "different scope: 12 vitals vs full EMR."
