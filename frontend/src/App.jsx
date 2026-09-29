@@ -52,6 +52,8 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme === 'dark' ? 'monitor' : 'paper'
+    const icon = document.querySelector("link[rel='icon']")
+    if (icon) icon.href = theme === 'dark' ? '/favicon-dark.svg' : '/favicon-light.svg'
     try {
       localStorage.setItem('syncura-theme', theme)
     } catch {

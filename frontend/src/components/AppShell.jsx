@@ -53,7 +53,7 @@ export function TopBar({ theme, onToggleTheme, landing = false }) {
   return (
     <header className={`topbar ${landing ? 'topbar-landing' : ''}`}>
       <Link to="/" className="topbar-brand" aria-label="SynCura home">
-        <BrandMark />
+        <BrandMark theme={theme} />
         <Wordmark />
       </Link>
 

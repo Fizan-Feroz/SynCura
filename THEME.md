@@ -196,6 +196,13 @@ before first paint that reads `localStorage` and `prefers-color-scheme`, so a
 dark-mode user never sees a flash of the light theme. `App.jsx` repeats the same
 mapping on the React side afterwards.
 
+**Brand.** The logo mark is the real SynCura artwork
+(`src/assets/syncura-mark-light.svg` for paper mode, `syncura-mark-dark.svg`
+for monitor mode), picked by the active theme in `Brand.jsx` — never the OS
+setting. Favicons follow the same rule (`public/favicon-light.svg` /
+`favicon-dark.svg`, swapped pre-paint and on every toggle). The `SynCura`
+wordmark stays set in Archivo Variable beside the mark.
+
 ---
 
 ## 6. Rules that hold the system together

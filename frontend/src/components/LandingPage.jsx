@@ -163,7 +163,7 @@ export default function LandingPage({ theme, onToggleTheme }) {
 
       <footer className="site-footer">
         <div className="site-footer-brand">
-          <BrandMark />
+          <BrandMark theme={theme} />
           <Wordmark />
         </div>
         <p className="small muted">
