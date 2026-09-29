@@ -24,6 +24,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
   const queued = patientQueue.find((p) => p.patient_id === patientId)
   const [shap, setShap] = useState(null)
   const [remoteBed, setRemoteBed] = useState(null)
+  const bed = queued || remoteBed
 
   useEffect(() => {
     let cancelled = false
@@ -64,7 +65,6 @@ export default function BedProfile({ theme, onToggleTheme }) {
     </AppShell>
   )
 
-  const bed = queued || remoteBed
   if (!bed) {
     return shell(
       <div className="page">
