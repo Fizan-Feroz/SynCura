@@ -32,11 +32,14 @@ DEFAULT_SEED = 20260928
 HISTORY_LIMIT = 60
 WAVEFORM_LIMIT = 12
 
-# Non-baseline scenarios are simulated what-if overlays: drift runs hotter so
-# the change is visible within a few ticks, and a capped risk nudge is added
-# on top of the model score. Baseline stays pure model output (the "real"
-# view). The snapshot flags simulated=true whenever a nudge is active.
-DRIFT_GAIN = 2.0
+# Non-baseline scenarios are simulated what-if overlays: drift runs slightly
+# hotter so the change is visible within a few ticks, and a capped risk nudge
+# is added on top of the model score. Baseline stays pure model output (the
+# "real" view). The snapshot flags simulated=true whenever a nudge is active.
+# Gain is deliberately modest (1.2, was 2.0): hotter gains slammed every bed
+# into the clamp rails within ~10 ticks, collapsing all differentiation.
+# Per-bed drift jitter (see _seed_bed) keeps beds distinct on top of that.
+DRIFT_GAIN = 1.2
 SCENARIO_NUDGE_PER_TICK = {
     "baseline": 0.0,
     "respiratory": 1.5,
@@ -46,6 +49,37 @@ SCENARIO_NUDGE_PER_TICK = {
 }
 NUDGE_CAP = 20
 NUDGE_RAMP_TICKS = 10
+
+# Slow-moving features the 4-channel sim does not drive. Anchored near
+# population-normal values with tiny per-tick noise so the model scorer
+# receives a full, realistic 12-feature vector instead of 8 NaN channels
+# (which collapsed every bed to the same middling score). No scenario drift
+# is applied to labs: in reality they move on hour/day timescales, far
+# slower than this tick. GCS stays integer-valued.
+LAB_ANCHORS = {
+    "GCS": 15,
+    "BUN": 18.0,
+    "Creatinine": 1.0,
+    "WBC": 8.0,
+    "Platelets": 250.0,
+    "Glucose": 110.0,
+}
+LAB_NOISE = {
+    "GCS": 0.0,
+    "BUN": 0.4,
+    "Creatinine": 0.03,
+    "WBC": 0.15,
+    "Platelets": 4.0,
+    "Glucose": 1.5,
+}
+LAB_BOUNDS = {
+    "GCS": (3, 15),
+    "BUN": (5, 80),
+    "Creatinine": (0.4, 6.0),
+    "WBC": (1.0, 30.0),
+    "Platelets": (20.0, 600.0),
+    "Glucose": (60.0, 300.0),
+}
 
 # Seed beds — must stay in sync with frontend/src/mimicDemoPatients.json.
 # backend/tests/test_simulation.py asserts parity.
@@ -184,6 +218,9 @@ class SimulationEngine:
             self.paused = True
             self.tick = 0
             self.scenario_tick = 0
+            self.tick_ms_last = 0.0
+            self.tick_ms_avg = 0.0
+            self.tick_ms_max = 0.0
             self.beds = [self._seed_bed(dict(p)) for p in SEED_PATIENTS]
 
     def _seed_bed(self, patient):
@@ -196,6 +233,12 @@ class SimulationEngine:
         else:
             risk = patient["risk"]
         risk = _round_half_up(_clamp(risk, 8, 95))
+        # Per-bed drift jitter so identical scenarios/trajectories still
+        # produce distinct beds instead of converging to the same rails.
+        drift_mult = 0.85 + self.rng.random() * 0.3
+        vitals = dict(patient["vitals"])
+        for lab, anchor in LAB_ANCHORS.items():
+            vitals.setdefault(lab, anchor)
         now = time.time()
         return {
             "patient_id": patient["patient_id"],
@@ -205,9 +248,10 @@ class SimulationEngine:
             "trend": "+0",
             "lead": profile["lead"],
             "trajectory": trajectory,
+            "drift_mult": drift_mult,
             "waveform": list(patient["waveform"][:-1]) + [risk],
-            "vitals": dict(patient["vitals"]),
-            "history": [{"t": now, **patient["vitals"], "risk": risk}],
+            "vitals": vitals,
+            "history": [{"t": now, **vitals, "risk": risk}],
         }
 
     def start(self):
@@ -243,7 +287,11 @@ class SimulationEngine:
     # ------------------------------------------------------------------ tick
 
     def set_scorer(self, scorer):
-        """Attach the model scorer thread-safely (called once at boot)."""
+        """Attach the model scorer thread-safely (called once at boot).
+
+        The scorer takes [(patient_id, vital_dict)] and returns aligned
+        risks, so one tick costs a handful of batched forwards.
+        """
         with self.lock:
             self.scorer = scorer
 
@@ -253,7 +301,9 @@ class SimulationEngine:
         Model scoring runs OUTSIDE the lock (it can take far longer than a
         tick) so snapshot()/control() never block behind torch inference.
         All RNG draws happen in the prepare phase, preserving determinism.
+        Step duration (ms) is recorded for the admin panel.
         """
+        t0 = time.perf_counter()
         with self.lock:
             if self.paused:
                 return self._snapshot_locked()
@@ -268,24 +318,48 @@ class SimulationEngine:
             now = time.time()
             pending = [self._prepare_bed(bed, profile, gain, now) for bed in self.beds]
             scorer = self.scorer
-        for bed, prep in zip(self.beds, pending):
-            prep["risk"] = self._score_prepared(bed, prep, nudge, now)
+        scored = self._score_pending(scorer, pending, nudge)
         with self.lock:
-            for bed, prep in zip(self.beds, pending):
-                self._commit_bed(bed, prep, scenario_lead)
+            for bed, prep, risk in zip(self.beds, pending, scored):
+                self._commit_bed(bed, prep, risk, scenario_lead)
+            dt_ms = (time.perf_counter() - t0) * 1000
+            self.tick_ms_last = dt_ms
+            self.tick_ms_max = max(self.tick_ms_max, dt_ms)
+            # Rolling mean without keeping history.
+            self.tick_ms_avg += (dt_ms - self.tick_ms_avg) / self.tick
             return self._snapshot_locked()
+
+    def _score_pending(self, scorer, pending, nudge):
+        """Resolve displayed risk for every prepared bed (lock-free)."""
+        if scorer is None:
+            scored = [None] * len(pending)
+        else:
+            try:
+                items = [(f"sim-{prep['bed_id']}", prep["vital_dict"]) for prep in pending]
+                scored = scorer(items)
+                if list(scored or []) and len(scored) != len(pending):
+                    raise ValueError(f"scorer returned {len(scored)} risks for {len(pending)} beds")
+            except Exception:
+                logger.exception("Simulation batch scorer failed; using heuristics")
+                scored = [None] * len(pending)
+        risks = []
+        for prep, s in zip(pending, scored):
+            base = prep["heuristic"] if s is None else int(s)
+            risks.append(_round_half_up(_clamp(base + nudge, 8, 99)))
+        return risks
 
     def _prepare_bed(self, bed, profile, gain, now):
         """Compute next vitals + heuristic risk. Caller must hold the lock."""
         traj = TRAJECTORY_PROFILES.get(bed.get("trajectory") or "stable",
                                        TRAJECTORY_PROFILES["stable"])
         randomizer = max(0.8, (profile["volatility"] + traj["volatility"]) / 2)
+        jitter = bed.get("drift_mult", 1.0)
         combined = {
-            "hr": (profile["hr"] + traj["hr"]) * gain,
-            "spo2": (profile["spo2"] + traj["spo2"]) * gain,
-            "resp": (profile["resp"] + traj["resp"]) * gain,
-            "temp": (profile["temp"] + traj["temp"]) * gain,
-            "riskDrift": (profile["riskDrift"] + traj["riskDrift"]) * gain,
+            "hr": (profile["hr"] + traj["hr"]) * gain * jitter,
+            "spo2": (profile["spo2"] + traj["spo2"]) * gain * jitter,
+            "resp": (profile["resp"] + traj["resp"]) * gain * jitter,
+            "temp": (profile["temp"] + traj["temp"]) * gain * jitter,
+            "riskDrift": (profile["riskDrift"] + traj["riskDrift"]) * gain * jitter,
         }
         v = bed["vitals"]
         next_vitals = {
@@ -301,39 +375,40 @@ class SimulationEngine:
                 v["Temp"] + combined["temp"] * 0.12 + _random_centered(self.rng, randomizer * 0.03),
                 34.5, 41)),
         }
+        for lab, anchor in LAB_ANCHORS.items():
+            lo, hi = LAB_BOUNDS[lab]
+            prev = v.get(lab, anchor)
+            if not isinstance(prev, (int, float)) or prev != prev:  # missing/NaN
+                prev = anchor
+            val = prev + _random_centered(self.rng, LAB_NOISE[lab])
+            next_vitals[lab] = int(_round_half_up(_clamp(val, lo, hi))) if lab == "GCS" else round(_clamp(val, lo, hi), 1)
         heuristic = _round_half_up(_clamp(
             bed["risk"] + combined["riskDrift"] * 0.35
             + _score_contributions(next_vitals) * 0.05
             + _random_centered(self.rng, randomizer), 8, 99))
-        return {"vitals": next_vitals, "heuristic": heuristic, "now": now,
-                "traj_lead": traj["lead"], "trajectory": bed.get("trajectory")}
-
-    def _score_prepared(self, bed, prep, nudge, now):
-        """Resolve displayed risk for prepared vitals. Lock-free by design."""
-        risk = prep["heuristic"]
-        scorer = self.scorer
-        if scorer is not None:
-            try:
-                scored = scorer(f"sim-{bed['patient_id']}", {
+        return {"bed_id": bed["patient_id"], "vitals": next_vitals,
+                "heuristic": heuristic, "now": now,
+                "traj_lead": traj["lead"], "trajectory": bed.get("trajectory"),
+                "vital_dict": {
                     "patient_id": f"sim-{bed['patient_id']}",
                     "timestamp": now,
-                    "HR": prep["vitals"]["HR"],
-                    "SpO2": prep["vitals"]["SpO2"],
-                    "RespRate": prep["vitals"]["Resp"],
-                    "Temp": prep["vitals"]["Temp"],
-                })
-                if scored is not None:
-                    risk = int(scored)
-            except Exception:
-                logger.exception("Simulation scorer failed for bed %s; using heuristic",
-                                 bed.get("patient_id"))
-        # Simulated what-if overlay: baseline shows the raw score, other
-        # scenarios add the capped nudge so the switch is visible in a tick.
-        return _round_half_up(_clamp(risk + nudge, 8, 99))
+                    "HR": next_vitals["HR"],
+                    "SpO2": next_vitals["SpO2"],
+                    "RespRate": next_vitals["Resp"],
+                    "Temp": next_vitals["Temp"],
+                    # Full 12-feature vector: labs/GCS ride along so the
+                    # model never scores a half-empty (8-NaN) window, which
+                    # collapsed every bed to the same middling score.
+                    "GCS": next_vitals["GCS"],
+                    "BUN": next_vitals["BUN"],
+                    "Creatinine": next_vitals["Creatinine"],
+                    "WBC": next_vitals["WBC"],
+                    "Platelets": next_vitals["Platelets"],
+                    "Glucose": next_vitals["Glucose"],
+                }}
 
-    def _commit_bed(self, bed, prep, scenario_lead):
+    def _commit_bed(self, bed, prep, risk, scenario_lead):
         """Write prepared results into bed state. Caller must hold the lock."""
-        risk = prep["risk"]
         change = risk - bed["risk"]
         if risk >= 85:
             lead = "Multi-organ deterioration"
@@ -357,6 +432,16 @@ class SimulationEngine:
         with self.lock:
             return self._snapshot_locked()
 
+    def tick_stats(self):
+        """Tick timing counters, read under lock for the admin panel."""
+        with self.lock:
+            return {
+                "tick": self.tick,
+                "tick_ms_last": round(self.tick_ms_last, 1),
+                "tick_ms_avg": round(self.tick_ms_avg, 1),
+                "tick_ms_max": round(self.tick_ms_max, 1),
+            }
+
     def _snapshot_locked(self):
         scenario = SCENARIOS[self.scenario]
         return {
@@ -368,6 +453,9 @@ class SimulationEngine:
             "paused": self.paused,
             "tick": self.tick,
             "seed": self.seed,
+            "tick_ms_last": round(self.tick_ms_last, 1),
+            "tick_ms_avg": round(self.tick_ms_avg, 1),
+            "tick_ms_max": round(self.tick_ms_max, 1),
             "beds": [dict(b, vitals=dict(b["vitals"]),
                           waveform=list(b["waveform"]),
                           history=[dict(h) for h in b["history"]]) for b in self.beds],

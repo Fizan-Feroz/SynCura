@@ -38,6 +38,8 @@ def _timeless(snap):
     for bed in snap['beds']:
         for point in bed['history']:
             point.pop('t', None)
+    for key in ('tick_ms_last', 'tick_ms_avg', 'tick_ms_max'):
+        snap.pop(key, None)
     return snap
 
 
@@ -123,7 +125,8 @@ def test_snapshot_schema_matches_frontend_shape():
     engine = make_engine(seed=9)
     snap = engine.step()
     assert snap['source'] == 'backend'
-    for key in ('scenario', 'scenario_label', 'simulated', 'scenario_tick', 'paused', 'tick', 'seed', 'beds'):
+    for key in ('scenario', 'scenario_label', 'simulated', 'scenario_tick', 'paused', 'tick', 'seed', 'beds',
+                'tick_ms_last', 'tick_ms_avg', 'tick_ms_max'):
         assert key in snap
     bed = snap['beds'][0]
     for key in ('patient_id', 'bed', 'status', 'risk', 'trend', 'lead',
@@ -131,6 +134,16 @@ def test_snapshot_schema_matches_frontend_shape():
         assert key in bed, key
     for key in ('HR', 'SpO2', 'Resp', 'Temp'):
         assert key in bed['vitals'], key
+
+
+def test_tick_timing_recorded():
+    engine = make_engine(seed=4)
+    engine.step()
+    engine.step()
+    stats = engine.tick_stats()
+    assert stats['tick'] == 2
+    assert stats['tick_ms_last'] >= 0
+    assert stats['tick_ms_max'] >= stats['tick_ms_avg'] >= 0
 
 
 def test_simulation_endpoints():

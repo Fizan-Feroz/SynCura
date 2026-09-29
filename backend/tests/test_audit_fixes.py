@@ -600,6 +600,38 @@ def test_scaler_with_wrong_feature_order_is_rejected(tmp_path):
         inference_module._load_json_scaler(str(path), 'test-member')
 
 
+def test_score_windows_matches_single_scoring(engine):
+    """Batched forwards must equal per-window math (same logits, same rounding)."""
+    import backend.inference as inf
+    pids = [f'batch-eq-{i}' for i in range(3)]
+    vitals = [dict(HEALTHY_VITALS, patient_id=pid, timestamp=60 * (i + 1)) for i, pid in enumerate(pids)]
+    windows = [engine.build_window(pid, v) for pid, v in zip(pids, vitals)]
+    assert all(w is not None for w in windows)
+    batched = engine.score_windows(windows)
+    singles = [engine._score_window(w) for w in windows]
+    assert batched == singles
+    # Batch invariance: same window twice in one batch scores identically.
+    doubled = engine.score_windows([windows[0], windows[0]])
+    assert doubled[0] == doubled[1] == batched[0]
+
+
+def test_score_windows_empty_and_modeless():
+    import backend.inference as inf
+    e = inf.RiskScoreEngine(model_path='nope.pt', manifest_path='none.json')
+    assert e.model is None and not e.models
+    assert e.score_windows([]) == []
+    w = (np.zeros((90, 12)), None)
+    assert e.score_windows([w, w]) == [None, None]
+
+
+def test_score_patient_batch_aligns_and_stores(engine):
+    pids = ['align-a', 'align-b']
+    items = [(pid, dict(HEALTHY_VITALS, patient_id=pid, timestamp=60)) for pid in pids]
+    out = engine.score_patient_batch(items)
+    assert len(out) == 2
+    assert out == [engine.get_risk_score(pid) for pid in pids]
+
+
 def test_cors_wildcard_does_not_allow_credentials():
     from fastapi.testclient import TestClient
     import backend.app as app_module

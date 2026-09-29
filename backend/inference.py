@@ -352,11 +352,11 @@ class RiskScoreEngine:
         initial = self.carry[patient_id][0].copy() if patient_id in self.carry else None
         return W, initial
 
-    def add_vital(self, patient_id, vital_dict):
-        """Add a vital measurement and compute risk score.
+    def build_window(self, patient_id, vital_dict):
+        """Buffer one reading and return its raw (window, carried-in) tuple.
 
-        Returns an int 0-100, or None when no model is loaded / inference
-        fails (callers must surface this instead of inventing a score).
+        Returns None when the patient has no buffered minutes yet. Locking
+        lives inside; scoring is separate so callers can batch it.
         """
         vital_dict = canonicalize_vital(vital_dict)
         vec = np.array([_to_float(vital_dict.get(f)) for f in FEATURES], dtype=np.float64)
@@ -388,8 +388,15 @@ class RiskScoreEngine:
                     seen = counts > 0
                     means = np.divide(sums, counts, out=np.full(len(FEATURES), np.nan), where=seen)
                     self._update_carry(self._carry_locked(patient_id), m, means, seen)
-            window = self._window_locked(patient_id)
+            return self._window_locked(patient_id)
 
+    def add_vital(self, patient_id, vital_dict):
+        """Add a vital measurement and compute risk score.
+
+        Returns an int 0-100, or None when no model is loaded / inference
+        fails (callers must surface this instead of inventing a score).
+        """
+        window = self.build_window(patient_id, vital_dict)
         if window is None:
             return None
         # Model inference runs OUTSIDE the lock so one slow patient cannot
@@ -426,18 +433,65 @@ class RiskScoreEngine:
 
     def _score_window(self, window):
         """Score a raw window. Returns int 0-100, or None on failure."""
-        if self.model is None and not self.models:
+        risks = self.score_windows([window])
+        return risks[0]
+
+    def score_windows(self, windows):
+        """Score a batch of raw windows with one forward pass per model.
+
+        Returns a list of int 0-100 / None aligned with the input, using
+        exactly the same per-window math as the old single-window path
+        (logit average across members, then sigmoid). Batching cuts per-tick
+        torch overhead from O(beds x members) forwards to O(members).
+        """
+        models = self.models if self.models else ([self.model] if self.model is not None else [])
+        if not models:
             with self.lock:
                 self.degraded = True
-            return None
-        try:
-            with torch.inference_mode():
-                logits = [m(torch.from_numpy(X[None])).item() for m, X in self._member_inputs(window)]
-            prob = 1.0 / (1.0 + math.exp(-sum(logits) / len(logits)))
-            return max(0, min(100, round(prob * 100)))
-        except Exception:
-            logger.exception('[Inference] Error computing score')
-            return None
+            return [None] * len(windows)
+        if not windows:
+            return []
+        scalers = self.member_scalers if self.models else [(None, None)]
+        per_model_logits = []
+        for model, (mean, std) in zip(models, scalers or [(None, None)] * len(models)):
+            try:
+                batch = np.stack([self._prepare(w, mean, std) for w in windows])
+            except ValueError:
+                per_model_logits.append(None)
+                continue
+            try:
+                with torch.inference_mode():
+                    out = model(torch.from_numpy(batch)).detach().cpu().numpy().ravel()
+                per_model_logits.append(out)
+            except Exception:
+                logger.exception('[Inference] Error computing batch scores')
+                per_model_logits.append(None)
+        risks = []
+        for i in range(len(windows)):
+            vals = [arr[i] for arr in per_model_logits if arr is not None]
+            if not vals:
+                risks.append(None)
+                continue
+            prob = 1.0 / (1.0 + math.exp(-sum(vals) / len(vals)))
+            risks.append(max(0, min(100, round(prob * 100))))
+        return risks
+
+    def score_patient_batch(self, items):
+        """Buffer readings for [(patient_id, vital_dict)] and score them batched.
+
+        Returns risks aligned with items. Used by the simulation tick so all
+        beds share a handful of forward passes instead of one per bed.
+        """
+        windows = [self.build_window(pid, vd) for pid, vd in items]
+        scored_idx = [i for i, w in enumerate(windows) if w is not None]
+        risks = self.score_windows([windows[i] for i in scored_idx])
+        out = [None] * len(items)
+        for i, risk in zip(scored_idx, risks):
+            out[i] = risk
+            if risk is not None:
+                with self.lock:
+                    self.risk_scores[items[i][0]] = risk
+        return out
 
     def get_model_input(self, patient_id):
         """Normalized window the PRIMARY model scores (for SHAP / attention), or None."""

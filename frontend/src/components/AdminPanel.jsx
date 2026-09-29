@@ -240,6 +240,7 @@ export default function AdminPanel() {
               <div><dt>Session avg</dt><dd className="num">{throughput.avg == null ? '—' : throughput.avg.toFixed(1)}</dd></div>
               <div><dt>Total</dt><dd className="num">{runtime.ingest_count ?? '—'}</dd></div>
               <div><dt>Last ingest</dt><dd className="num">{formatAgo(runtime.last_ingest_time)}</dd></div>
+              <div><dt>Tick (last/avg)</dt><dd className="num">{status?.simulation ? `${status.simulation.tick_ms_last ?? '—'} / ${status.simulation.tick_ms_avg ?? '—'} ms` : '—'}</dd></div>
             </dl>
           </div>
         </section>

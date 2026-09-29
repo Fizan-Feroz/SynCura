@@ -72,7 +72,7 @@ inference_engine = get_engine()
 # Shared scenario engine: every browser sees the same beds. Ticks score real
 # model risk via the inference engine; patient ids are sim-namespaced.
 sim_engine = get_sim_engine()
-sim_engine.set_scorer(lambda pid, vitals: inference_engine.add_vital(pid, vitals))
+sim_engine.set_scorer(inference_engine.score_patient_batch)
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START_TIME = time.time()
 INGEST_COUNT = 0
@@ -384,6 +384,10 @@ def admin_status():
             "ensemble_members": len(inference_engine.models),
             "degraded": inference_engine.degraded,
             "load_error": inference_engine.load_error,
+        },
+        "simulation": {
+            "scenario": sim_engine.snapshot().get("scenario"),
+            **sim_engine.tick_stats(),
         },
         "runtime": runtime_throughput(),
     }
