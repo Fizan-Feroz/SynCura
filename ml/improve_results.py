@@ -40,13 +40,15 @@ CONFIGS = {
     'gap': {'gap': True, 'hidden': 96, 'model': 'attention'},
     'gap128': {'gap': True, 'hidden': 128, 'model': 'attention'},
     'gapfuse': {'gap': True, 'hidden': 96, 'model': 'fusion'},
+    'grud': {'gap': True, 'hidden': 96, 'model': 'grud'},
 }
 
 
 def model_class_for(cfg):
     from ml import train_lstm
     return {'attention': train_lstm.AttentionLSTMModel,
-            'fusion': train_lstm.AttentionLSTMFusionModel}[cfg['model']]
+            'fusion': train_lstm.AttentionLSTMFusionModel,
+            'grud': train_lstm.GRUDModel}[cfg['model']]
 
 
 def feature_names(gap):

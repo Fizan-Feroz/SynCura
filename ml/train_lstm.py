@@ -154,6 +154,58 @@ class AttentionLSTMFusionModel(nn.Module):
         return attn_weights.squeeze(-1)  # (batch, seq)
 
 
+class GRUDModel(nn.Module):
+    """GRU with learnable missingness decay (Che et al., Sci Rep 2018, S9).
+
+    Input is the 24-dim gap-channel frame: values (F) + minutes-since-observed
+    deltas (F). The mask is derived (delta == 0 means measured now). Per step:
+      gamma_x = exp(-relu(W_gx * delta + b_gx))   (per-feature input decay)
+      x_hat   = m*x + (1-m)*(gamma_x*x_last + (1-gamma_x)*x_mean)
+      gamma_h = exp(-relu(W_gh * delta_mean + b_gh))  (hidden decay)
+      h       = GRUCell([x_hat, m], gamma_h * h_prev)
+    Fully causal and forward-only, so it respects the streaming constraint.
+    Initialized at zero decay (gamma = 1) = plain GRU; decay is learned.
+    """
+
+    def __init__(self, input_size=24, hidden_size=96, num_layers=1, dropout=0.3,
+                 bidirectional=False):
+        super().__init__()
+        # input_size is the full gap frame (2F: values + deltas)
+        assert input_size % 2 == 0, 'GRUDModel expects values+deltas (even width)'
+        input_size = input_size // 2
+        self.n_features = input_size
+        self.hidden_size = hidden_size
+        self.x_mean = nn.Parameter(torch.zeros(input_size))
+        self.gamma_x_w = nn.Parameter(torch.zeros(input_size))
+        self.gamma_x_b = nn.Parameter(torch.zeros(input_size))
+        self.gamma_h_w = nn.Parameter(torch.zeros(1))
+        self.gamma_h_b = nn.Parameter(torch.zeros(1))
+        self.gru_cell = nn.GRUCell(input_size * 2, hidden_size)
+        self.dropout = nn.Dropout(dropout)
+        self.batch_norm = nn.BatchNorm1d(hidden_size)
+        self.fc = nn.Linear(hidden_size, 1)
+
+    def forward(self, x):
+        # x: (B, T, 2F) with values first, deltas second (gap_channels layout)
+        F = self.n_features
+        vals, deltas = x[..., :F], x[..., F:F * 2]
+        mask = (deltas <= 0.5).to(vals.dtype)
+        B, T, _ = vals.shape
+        device = vals.device
+        h = torch.zeros(B, self.hidden_size, device=device)
+        x_last = self.x_mean.unsqueeze(0).expand(B, F)
+        for t in range(T):
+            v, m, d = vals[:, t, :], mask[:, t, :], deltas[:, t, :]
+            gx = torch.exp(-torch.relu(self.gamma_x_w * d + self.gamma_x_b))
+            x_hat = m * v + (1.0 - m) * (gx * x_last + (1.0 - gx) * self.x_mean)
+            x_last = m * v + (1.0 - m) * x_last
+            gh = torch.exp(-torch.relu(
+                self.gamma_h_w * d.mean(dim=1, keepdim=True) + self.gamma_h_b))
+            h = self.gru_cell(torch.cat([x_hat, m], dim=1), gh * h)
+        out = self.fc(self.batch_norm(self.dropout(h)))
+        return out.squeeze(-1)
+
+
 def train(
     X,
     y,

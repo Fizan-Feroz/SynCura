@@ -9,6 +9,12 @@ hard error instead of relying on nobody making a mistake.
 
 Keep this in sync with DATA.md by hand — there's no automatic check that
 they agree, so if you change one, change the other.
+
+SCOPE DECISION (2026-09-29): modeling uses PhysioNet 2012 ('physionet2012')
+and Challenge 2019 ('challenge2019') ONLY. Every other entry below is
+OUT OF SCOPE — kept in this file solely so `require()` keeps rejecting
+misuse with a clear reason (and so existing loaders/tests keep working),
+not as an endorsement. Do not train, evaluate, or report on them.
 """
 
 REAL = 'real'
@@ -49,68 +55,69 @@ DATASETS = {
     'mimic3_demo': {
         'kind': REAL,
         'capabilities': set(),  # deliberately empty: ETL testbed only
-        'note': 'n=100. Build/debug the MIMIC->12-feature mapper here. Never train.',
+        'note': 'OUT OF SCOPE (2012+2019 only). n=100. Never train.',
     },
     'mimic4_demo': {
         'kind': REAL,
         'capabilities': set(),
-        'note': 'n=100. Same as mimic3_demo. Never train.',
+        'note': 'OUT OF SCOPE (2012+2019 only). n=100. Never train.',
     },
     'eicu_demo': {
         'kind': REAL,
         'capabilities': {'external_eval'},
         'note': (
-            '~2,500 stays, 20 hospitals, but a demo subset - a good score '
-            'here is evidence the external-validation code path works, not '
-            'evidence of real external validation. Full eICU-CRD is what '
-            'would give an actual external-validation result.'
+            'OUT OF SCOPE (2012+2019 only). ~2,500 stays, 20 hospitals, '
+            'but a demo subset - a good score here is evidence the '
+            'external-validation code path works, not evidence of real '
+            'external validation.'
         ),
     },
     'hospital_deterioration': {
         'kind': SIMULATED,
         'capabilities': {'smoke_test'},
         'note': (
-            'Simulated, not real patients. Its 12-feature coverage is also '
-            'incomplete: no GCS, BUN, Platelets, or Glucose exist anywhere '
-            'in its schema, so those 4 of 12 model input channels are '
-            'never exercised by this dataset. Never report metrics from '
-            'this as clinical evidence, per DATA.md.'
+            'OUT OF SCOPE (2012+2019 only). Simulated, not real patients. '
+            'Its 12-feature coverage is also incomplete: no GCS, BUN, '
+            'Platelets, or Glucose exist anywhere in its schema, so those '
+            '4 of 12 model input channels are never exercised by this '
+            'dataset. Never report metrics from this as clinical evidence, '
+            'per DATA.md.'
         ),
     },
     'kaggle_icu_mortality': {
         'kind': REAL,
         'capabilities': {'tabular_baseline'},
-        'note': 'Aggregate rows, not time series. Unusable by the LSTM.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Aggregate rows, not time series. Unusable by the LSTM.',
     },
     'kaggle_icu_risk_score': {
         'kind': REAL,
         'capabilities': {'tabular_baseline'},
-        'note': '1k rows, precomputed risk_score. Sanity checks only.',
+        'note': 'OUT OF SCOPE (2012+2019 only). 1k rows, precomputed risk_score. Sanity checks only.',
     },
     'kaggle_sepsis_mimic_style': {
         'kind': REAL,
         'capabilities': {'tabular_baseline'},
-        'note': 'Aggregate rows, not time series. Unusable by the LSTM.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Aggregate rows, not time series. Unusable by the LSTM.',
     },
     'mimic4_ed_demo': {
         'kind': REAL,
         'capabilities': set(),
-        'note': 'Skipped entirely per DATA.md: wrong care setting, no ICU mortality label.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Wrong care setting, no ICU mortality label.',
     },
     'mimic4_full': {
         'kind': CREDENTIALED_MISSING,
         'capabilities': set(),
-        'note': 'Requires PhysioNet login + CITI + signed DUA. Never redistribute via team Drive.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Requires PhysioNet login + CITI + signed DUA. Never redistribute via team Drive.',
     },
     'eicu_crd_full': {
         'kind': CREDENTIALED_MISSING,
         'capabilities': set(),
-        'note': 'Same access requirements as mimic4_full.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Same access requirements as mimic4_full.',
     },
     'hirid': {
         'kind': CREDENTIALED_MISSING,
         'capabilities': set(),
-        'note': 'Same access requirements as mimic4_full.',
+        'note': 'OUT OF SCOPE (2012+2019 only). Same access requirements as mimic4_full.',
     },
 }
 
