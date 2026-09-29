@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { BackendStatusPanel, useSimulation } from '../simulationContext'
-import { API_URL } from '../api'
+import { API_URL, apiGet } from '../api'
 import { gsap, Flip, REDUCED } from '../motion/gsap'
 import AppShell from './AppShell'
 import { riskLabel, riskTone, seriesPath } from './trace'
@@ -207,7 +207,57 @@ export default function Dashboard({ theme, onToggleTheme }) {
   }, [orderKey])
 
   const needReview = patientQueue.filter((p) => p.risk >= threshold).length
-  const alerts = useMemo(() => buildAlerts(patientQueue), [patientQueue])
+  // Model attribution per alerted bed, fetched lazily from /explain and
+  // refreshed at most every 30s per bed — SHAP costs seconds per call, so
+  // only beds with an active alert are ever queried.
+  const [explainMap, setExplainMap] = useState({})
+  const alertPids = useMemo(() => buildAlerts(patientQueue).map((a) => a.patient_id), [patientQueue])
+  useEffect(() => {
+    if (!backendOnline || !alertPids.length) return undefined
+    let cancelled = false
+    const now = Date.now()
+    const targets = alertPids.filter((pid) => {
+      const entry = explainMap[pid]
+      return !entry || now - entry.at > 30000
+    })
+    if (!targets.length) return undefined
+    Promise.all(targets.map(async (pid) => {
+      try {
+        const body = await apiGet(`/patient/${encodeURIComponent(pid)}/explain`)
+        const imp = body?.feature_importance
+        if (cancelled || !imp || typeof imp !== 'object' || imp.error) return null
+        const top = Object.entries(imp)
+          .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
+          .slice(0, 3)
+          .map(([name]) => name)
+        return [pid, top]
+      } catch {
+        return null
+      }
+    })).then((pairs) => {
+      if (cancelled) return
+      const fresh = {}
+      for (const pair of pairs) {
+        if (pair) fresh[pair[0]] = pair[1]
+      }
+      if (Object.keys(fresh).length) {
+        setExplainMap((prev) => {
+          const next = { ...prev }
+          for (const [pid, top] of Object.entries(fresh)) next[pid] = { features: top, at: Date.now() }
+          return next
+        })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [alertPids, backendOnline]) // eslint-disable-line react-hooks/exhaustive-deps
+  const flatExplain = useMemo(() => {
+    const flat = {}
+    for (const [pid, entry] of Object.entries(explainMap)) flat[pid] = entry.features
+    return flat
+  }, [explainMap])
+  const alerts = useMemo(() => buildAlerts(patientQueue, flatExplain), [patientQueue, flatExplain])
   const modelPerf = useMemo(
     () => classificationStats(patientQueue.map((p) => ({ actual: hasDeteriorationEvent(p), predicted: p.risk >= threshold }))),
     [patientQueue, threshold]
@@ -428,6 +478,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                           <strong className="alert-title">{a.title}</strong>
                           {a.condition && <span className="alert-condition">{a.condition}</span>}
                           <span>{a.signal}</span>
+                          {a.modelAttribution && <span className="alert-model"><strong>Model:</strong> {a.modelAttribution.replace('Model attribution: ', '')}</span>}
                           <span className="alert-cause"><strong>Why:</strong> {a.cause}</span>
                           <span className="alert-action"><strong>Do:</strong> {a.action}</span>
                         </span>

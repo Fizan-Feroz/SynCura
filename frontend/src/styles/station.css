@@ -404,9 +404,15 @@
 }
 
 .alert-cause strong,
-.alert-action strong {
+.alert-action strong,
+.alert-model strong {
   color: var(--ink);
   font-weight: 600;
+}
+
+.alert-model {
+  font-size: var(--t-xs);
+  color: var(--brand);
 }
 
 @keyframes alert-in {

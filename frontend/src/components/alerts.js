@@ -56,14 +56,20 @@ export function calculateNews2({ vitals = {} } = {}) {
   return score
 }
 
-export function buildAlerts(patients) {
+export function buildAlerts(patients, explainMap = {}) {
   // One alert per bed: the highest-severity active condition wins. When a bed
   // escalates (e.g. warning -> critical), the new alert replaces the old one
   // instead of stacking, so the list never shows stale repeats.
+  // explainMap is {patient_id: [feature names]} from /patient/{id}/explain —
+  // model attribution, shown alongside the heuristic cause.
   const alerts = []
   patients.forEach((p) => {
     if (!p || !p.vitals) return
-    const base = { key: `${p.patient_id}-alert`, bed: p.bed }
+    const base = { key: `${p.patient_id}-alert`, bed: p.bed, patient_id: p.patient_id }
+    const modelTop = explainMap[p.patient_id]
+    const modelAttribution = Array.isArray(modelTop) && modelTop.length
+      ? `Model attribution: ${modelTop.join(', ')}`
+      : null
     if (p.risk >= 90) {
       alerts.push({
         ...base,
@@ -73,6 +79,7 @@ export function buildAlerts(patients) {
         signal: `Risk ${p.risk}% (alerts at 90%).`,
         cause: 'The concerning vitals behind this score are shown above. Sensors can also misread — confirm the probe and repeat key readings before acting on numbers alone.',
         action: 'See the patient now and follow your unit\u2019s escalation protocol.',
+        modelAttribution,
       })
       return
     }
@@ -84,6 +91,7 @@ export function buildAlerts(patients) {
         signal: `Low oxygen: SpO2 ${p.vitals.SpO2}% — alert level is 88% or below.`,
         cause: 'The probe may have slipped or be giving a weak signal. Check placement, then recheck the reading.',
         action: 'Reassess the patient; if it stays low, escalate per your unit\u2019s protocol.',
+        modelAttribution,
       })
       return
     }
@@ -95,6 +103,7 @@ export function buildAlerts(patients) {
         signal: `Fast breathing: ${p.vitals.Resp} breaths a minute — alert level is 30 or more.`,
         cause: 'Monitors can miscount when the patient moves. Count breaths yourself over a full minute to confirm.',
         action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
+        modelAttribution,
       })
       return
     }
@@ -106,6 +115,7 @@ export function buildAlerts(patients) {
         signal: `High temperature: ${p.vitals.Temp.toFixed(1)} °C — alert level is 39 °C or above.`,
         cause: 'Thermometers and measurement sites vary. Repeat the measurement to confirm.',
         action: 'Assess the patient; if confirmed, escalate per your unit\u2019s protocol.',
+        modelAttribution,
       })
     }
   })
