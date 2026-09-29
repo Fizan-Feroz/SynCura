@@ -38,7 +38,8 @@ export function topClinicalPattern(vitals, count = 2) {
   return unique.length ? unique.join(' + ') : 'insufficient data'
 }
 
-export function calculateNews2({ vitals: { HR, Resp, Temp, SpO2 } }) {
+export function calculateNews2({ vitals = {} } = {}) {
+  const { HR, Resp, Temp, SpO2 } = vitals
   let score = 0
   if (Resp <= 8 || Resp >= 25) score += 3
   else if (Resp >= 21) score += 2
@@ -61,6 +62,7 @@ export function buildAlerts(patients) {
   // instead of stacking, so the list never shows stale repeats.
   const alerts = []
   patients.forEach((p) => {
+    if (!p || !p.vitals) return
     const base = { key: `${p.patient_id}-alert`, bed: p.bed }
     if (p.risk >= 90) {
       alerts.push({

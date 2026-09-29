@@ -335,7 +335,7 @@ All components for the ML training frontend have been successfully implemented, 
 - [x] .env.example template exists
 - [x] BACKEND_PORT configurable
 - [x] VITE_API_URL configurable (single client: `frontend/src/api.js`)
-- [ ] DATABASE_URL configurable — NOT read by `backend/db.py` (uses `backend/data/vitals.db`)
+- [ ] DATABASE_URL configurable — NOT read by `backend/db.py` (uses `backend/data/vitals.db`); either wire it or drop it from `.env.example`
 - [x] MODEL_PATH configurable (plus `ml/deployed_manifest.json` for the ensemble)
 
 ## Known Limitations & Future Work

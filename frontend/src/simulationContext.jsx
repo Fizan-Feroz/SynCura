@@ -1,5 +1,4 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import mimicDemoPatients from './mimicDemoPatients.json'
 import { API_URL } from './api'
 
 export const SCENARIOS = {
@@ -68,8 +67,15 @@ function trajectoryProfile(trajectory) {
   }
 }
 
-function seedDemoBeds() {
-  return (Array.isArray(mimicDemoPatients) ? mimicDemoPatients : []).map((patient) => {
+async function loadDemoSeed() {
+  // Lazy so live/replay-only sessions never download the seed JSON.
+  const mod = await import('./mimicDemoPatients.json')
+  const list = Array.isArray(mod.default) ? mod.default : mod
+  return Array.isArray(list) ? list : []
+}
+
+function seedDemoBeds(patients) {
+  return (Array.isArray(patients) ? patients : []).map((patient) => {
     const trajectory = assignTrajectory()
     const profile = trajectoryProfile(trajectory)
     const risk = Math.round(clamp(
@@ -153,7 +159,7 @@ function pickLatestNumber(rows, key) {
 // Map a backend /patient/{id} payload (replayed PhysioNet rows, device
 // ingests, or anything else in the backend store) onto the bed shape the
 // views render. Missing vitals stay NaN so thresholds never misfire.
-function mapLivePatient(detail) {
+export function mapLivePatient(detail) {
   const rows = Array.isArray(detail?.vitals) ? detail.vitals : []
   const id = String(detail?.patient_id ?? 'unknown')
   const scores = rows.map((row) => Number(row?.risk_score)).filter(Number.isFinite).reverse()
@@ -350,9 +356,11 @@ export function SimulationProvider({ children }) {
   useEffect(() => {
     if (source !== 'replay' || backendStatus !== 'online') return undefined
     reloadReplay()
+    // 10s cadence: each cycle fans out to up to 12 detail fetches, so poll
+    // at half the live rate. Live stays at 5s to match the engine tick.
     const intervalId = window.setInterval(() => {
       if (document.visibilityState !== 'hidden') reloadReplay()
-    }, 5000)
+    }, 10000)
     return () => window.clearInterval(intervalId)
   }, [source, backendStatus, reloadReplay])
 
@@ -402,10 +410,12 @@ export function SimulationProvider({ children }) {
     setSource(next)
     setLiveError(null)
     if (next === 'demo') {
-      setPatientQueue(seedDemoBeds())
       setDemoScenario('baseline')
       setDemoPaused(true)
-      setLastUpdated(new Date())
+      loadDemoSeed().then((seed) => {
+        setPatientQueue(seedDemoBeds(seed))
+        setLastUpdated(new Date())
+      })
     }
   }, [])
 
@@ -441,10 +451,12 @@ export function SimulationProvider({ children }) {
       },
       resetSimulation: () => {
         if (demo) {
-          setPatientQueue(seedDemoBeds())
+          loadDemoSeed().then((seed) => {
+            setPatientQueue(seedDemoBeds(seed))
+            setLastUpdated(new Date())
+          })
           setDemoScenario('baseline')
           setDemoPaused(true)
-          setLastUpdated(new Date())
           return
         }
         controlLive('reset')

@@ -21,7 +21,7 @@ def run_benchmark():
     model = LSTMModel(input_size=features).to(device)
     model.train()
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-    loss_fn = torch.nn.BCELoss()
+    loss_fn = torch.nn.BCEWithLogitsLoss()  # LSTMModel returns logits
 
     X = torch.randn(batch_size, seq_len, features, device=device)
     y = torch.rand(batch_size, device=device).round()

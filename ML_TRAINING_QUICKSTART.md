@@ -249,7 +249,7 @@ print(f"Loss: {job['metrics'].get('train_loss', 'N/A')}")
 | Frontend React App | `frontend/` | 5173 | http://localhost:5173 |
 | Backend FastAPI | `backend/` | 8000 | http://localhost:8000 |
 | Training Service | `backend/training.py` | (background threads) | N/A |
-| Database | `backend/icu.db` | (SQLite) | (local file) |
+| Database | `backend/data/vitals.db` | (SQLite) | (local file) |
 
 ## Common Workflows
 

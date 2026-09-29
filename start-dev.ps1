@@ -40,9 +40,21 @@ $backendPython discordbot\discord_bot.py
 
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $backendCommand | Out-Null
 Start-Process powershell -ArgumentList "-NoExit", "-Command", $frontendCommand | Out-Null
-Start-Process powershell -ArgumentList "-NoExit", "-Command", $discordbotCommand | Out-Null
+$discordTokenConfigured = $env:DISCORD_BOT_TOKEN
+if (-not $discordTokenConfigured) {
+  $envFile = Join-Path $repoRoot ".env"
+  if (Test-Path $envFile) {
+    $discordTokenConfigured = Select-String -Path $envFile -Pattern '^DISCORD_BOT_TOKEN=\S+' -Quiet
+  }
+}
+if ($discordTokenConfigured) {
+  Start-Process powershell -ArgumentList "-NoExit", "-Command", $discordbotCommand | Out-Null
+  Write-Host "Discord Bot:  Running in separate terminal"
+} else {
+  Write-Host "Discord Bot:  Skipped (DISCORD_BOT_TOKEN not set)"
+}
 
-Write-Host "Started backend, frontend, and Discord bot in separate terminals."
+Write-Host "Started backend and frontend in separate terminals."
 Write-Host "Backend:      http://127.0.0.1:$BackendPort"
 Write-Host "Frontend:     http://127.0.0.1:$FrontendPort"
 Write-Host "Discord Bot:  Running in separate terminal"

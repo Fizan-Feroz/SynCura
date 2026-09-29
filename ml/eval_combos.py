@@ -5,7 +5,10 @@ import numpy as np
 import torch
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.dataset import SERVING_FEATURES
+from ml.paths import physionet2012_root as _pn_root
+
+BASE = _pn_root()
 
 R16 = 'ml/training_runs/exp_20260916_213919'
 R17 = 'ml/training_runs/exp_20260916_220047'
@@ -33,8 +36,7 @@ def load_val_labels():
     from sklearn.model_selection import GroupShuffleSplit
     X, y, pid = load_and_create_sequences(
         physionet_dir=os.path.join(BASE, 'set-a'), outcomes_file=os.path.join(BASE, 'Outcomes-a.txt'),
-        vital_features=['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-                        'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose'],
+        vital_features=SERVING_FEATURES,
         window_minutes=90, stride=15, label_mode='proximity', horizon_hours=12)
     gss = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
     _, v_idx = next(gss.split(X, y, groups=pid))
@@ -46,8 +48,7 @@ def load_holdout_labels():
     _, y, _ = load_and_create_sequences(
         physionet_dir=os.path.join(BASE, 'set-b_full', 'set-b'),
         outcomes_file=os.path.join(BASE, 'Outcomes-b.txt'),
-        vital_features=['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-                        'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose'],
+        vital_features=SERVING_FEATURES,
         window_minutes=90, stride=15, label_mode='proximity', horizon_hours=12)
     return y
 
@@ -71,8 +72,7 @@ def normed_arrays(which):
     from ml.dataset import load_and_create_sequences
     s = json.load(open('ml/scaler.json'))
     mean = np.array(s['mean']); std = np.array(s['std'])
-    feats = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-             'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+    feats = list(SERVING_FEATURES)
     if which == 'va':
         X, y, pid = load_and_create_sequences(
             physionet_dir=os.path.join(BASE, 'set-a'), outcomes_file=os.path.join(BASE, 'Outcomes-a.txt'),

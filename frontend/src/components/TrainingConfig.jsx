@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import axios from 'axios'
-import { API_URL } from '../api'
+import { apiPost, trainingHeaders } from '../api'
 
 const SERVING_FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2', 'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
 const FEATURE_GROUPS = [
@@ -43,10 +42,10 @@ export default function TrainingConfig() {
     setError(null)
     setLoading(true)
     try {
-      const res = await axios.post(`${API_URL}/training/start`, form)
-      navigate(`/training/${res.data.job_id}`)
+      const data = await apiPost('/training/start', form, trainingHeaders())
+      navigate(`/training/${encodeURIComponent(data.job_id)}`)
     } catch (err) {
-      setError(err.response?.data?.detail || err.message || 'Training could not start.')
+      setError(err.message || 'Training could not start.')
       setLoading(false)
     }
   }
@@ -109,7 +108,7 @@ export default function TrainingConfig() {
                 {g.items.map((f) => (
                   <label key={f} className="chip">
                     <input type="checkbox" checked={form.vital_features.includes(f)} onChange={() => toggleFeature(f)} />
-                    <span>{f}</span>
+                    <span>{f === 'EtCO2' ? 'EtCO2 (stored only, never served)' : f}</span>
                   </label>
                 ))}
               </div>

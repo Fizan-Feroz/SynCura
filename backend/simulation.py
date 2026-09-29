@@ -12,11 +12,20 @@ is attached, falling back to the heuristic drift when the model is missing.
 
 Restart behaviour (by decision): reseed on boot. No persistence — Render's
 disk is ephemeral.
+
+Divergences from the old browser engine (deliberate, do not "fix" without
+deciding): non-baseline scenarios run hotter drift (DRIFT_GAIN) plus a capped
+risk nudge; displayed risk is the model score when a scorer is attached
+(frontend demo never calls a model); backend waveform keeps 12 points while
+the old frontend kept 6.
 """
+import logging
 import math
 import random
 import threading
 import time
+
+logger = logging.getLogger('syncura.simulation')
 
 TICK_SECONDS = 5
 DEFAULT_SEED = 20260928
@@ -233,8 +242,18 @@ class SimulationEngine:
 
     # ------------------------------------------------------------------ tick
 
+    def set_scorer(self, scorer):
+        """Attach the model scorer thread-safely (called once at boot)."""
+        with self.lock:
+            self.scorer = scorer
+
     def step(self):
-        """Advance every bed one tick. Returns the new snapshot."""
+        """Advance every bed one tick. Returns the new snapshot.
+
+        Model scoring runs OUTSIDE the lock (it can take far longer than a
+        tick) so snapshot()/control() never block behind torch inference.
+        All RNG draws happen in the prepare phase, preserving determinism.
+        """
         with self.lock:
             if self.paused:
                 return self._snapshot_locked()
@@ -247,11 +266,17 @@ class SimulationEngine:
                            * min(self.scenario_tick, NUDGE_RAMP_TICKS),
                            -NUDGE_CAP, NUDGE_CAP)
             now = time.time()
-            for bed in self.beds:
-                self._update_bed(bed, profile, scenario_lead, gain, nudge, now)
+            pending = [self._prepare_bed(bed, profile, gain, now) for bed in self.beds]
+            scorer = self.scorer
+        for bed, prep in zip(self.beds, pending):
+            prep["risk"] = self._score_prepared(bed, prep, nudge, now)
+        with self.lock:
+            for bed, prep in zip(self.beds, pending):
+                self._commit_bed(bed, prep, scenario_lead)
             return self._snapshot_locked()
 
-    def _update_bed(self, bed, profile, scenario_lead, gain, nudge, now):
+    def _prepare_bed(self, bed, profile, gain, now):
+        """Compute next vitals + heuristic risk. Caller must hold the lock."""
         traj = TRAJECTORY_PROFILES.get(bed.get("trajectory") or "stable",
                                        TRAJECTORY_PROFILES["stable"])
         randomizer = max(0.8, (profile["volatility"] + traj["volatility"]) / 2)
@@ -280,40 +305,51 @@ class SimulationEngine:
             bed["risk"] + combined["riskDrift"] * 0.35
             + _score_contributions(next_vitals) * 0.05
             + _random_centered(self.rng, randomizer), 8, 99))
-        risk = heuristic
-        if self.scorer is not None:
+        return {"vitals": next_vitals, "heuristic": heuristic, "now": now,
+                "traj_lead": traj["lead"], "trajectory": bed.get("trajectory")}
+
+    def _score_prepared(self, bed, prep, nudge, now):
+        """Resolve displayed risk for prepared vitals. Lock-free by design."""
+        risk = prep["heuristic"]
+        scorer = self.scorer
+        if scorer is not None:
             try:
-                scored = self.scorer(f"sim-{bed['patient_id']}", {
+                scored = scorer(f"sim-{bed['patient_id']}", {
                     "patient_id": f"sim-{bed['patient_id']}",
                     "timestamp": now,
-                    "HR": next_vitals["HR"],
-                    "SpO2": next_vitals["SpO2"],
-                    "RespRate": next_vitals["Resp"],
-                    "Temp": next_vitals["Temp"],
+                    "HR": prep["vitals"]["HR"],
+                    "SpO2": prep["vitals"]["SpO2"],
+                    "RespRate": prep["vitals"]["Resp"],
+                    "Temp": prep["vitals"]["Temp"],
                 })
                 if scored is not None:
                     risk = int(scored)
             except Exception:
-                pass
+                logger.exception("Simulation scorer failed for bed %s; using heuristic",
+                                 bed.get("patient_id"))
         # Simulated what-if overlay: baseline shows the raw score, other
         # scenarios add the capped nudge so the switch is visible in a tick.
-        risk = _round_half_up(_clamp(risk + nudge, 8, 99))
+        return _round_half_up(_clamp(risk + nudge, 8, 99))
+
+    def _commit_bed(self, bed, prep, scenario_lead):
+        """Write prepared results into bed state. Caller must hold the lock."""
+        risk = prep["risk"]
         change = risk - bed["risk"]
         if risk >= 85:
             lead = "Multi-organ deterioration"
         elif risk < 45:
             lead = "Baseline recovery"
-        elif bed.get("trajectory") == "recovery":
-            lead = traj["lead"]
+        elif prep["trajectory"] == "recovery":
+            lead = prep["traj_lead"]
         else:
             lead = scenario_lead
-        bed["vitals"] = next_vitals
+        bed["vitals"] = prep["vitals"]
         bed["risk"] = risk
         bed["trend"] = f"{'+' if change >= 0 else ''}{change}"
         bed["status"] = _status_for_risk(risk)
         bed["lead"] = lead
         bed["waveform"] = (bed["waveform"] + [risk])[-WAVEFORM_LIMIT:]
-        bed["history"] = (bed["history"] + [{"t": now, **next_vitals, "risk": risk}])[-HISTORY_LIMIT:]
+        bed["history"] = (bed["history"] + [{"t": prep["now"], **prep["vitals"], "risk": risk}])[-HISTORY_LIMIT:]
 
     # ------------------------------------------------------------------ read
 
@@ -353,7 +389,7 @@ class SimulationEngine:
             try:
                 self.step()
             except Exception:
-                pass
+                logger.exception("Simulation tick failed")
 
 
 _engine = None

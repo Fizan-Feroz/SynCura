@@ -10,9 +10,14 @@ except ImportError:
     from inference import get_engine, canonicalize_vital
 
 MQTT_BROKER = os.getenv("MQTT_BROKER", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+try:
+    MQTT_PORT = int(os.getenv("MQTT_PORT", 1883))
+except (TypeError, ValueError):
+    print("Invalid MQTT_PORT; using default 1883")
+    MQTT_PORT = 1883
 MQTT_USERNAME = os.getenv("MQTT_USERNAME", "")
 MQTT_PASSWORD = os.getenv("MQTT_PASSWORD", "")
+MQTT_TLS = os.getenv("MQTT_TLS", "").strip().lower() in ("1", "true", "yes")
 TOPIC = os.getenv("MQTT_TOPIC", "vitals/#")
 
 REQUIRED_FIELDS = {"patient_id", "timestamp"}
@@ -58,5 +63,7 @@ client.on_message = on_message
 if __name__ == "__main__":
     if MQTT_USERNAME:
         client.username_pw_set(MQTT_USERNAME, MQTT_PASSWORD or None)
+    if MQTT_TLS:
+        client.tls_set()
     client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.loop_forever()

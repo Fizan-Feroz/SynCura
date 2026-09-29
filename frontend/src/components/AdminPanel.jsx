@@ -58,10 +58,12 @@ export default function AdminPanel() {
 
   const check = useCallback(async () => {
     const started = performance.now()
+    let sawSuccess = false
     try {
       let payload = null
       try {
         payload = await apiGet('/admin/status')
+        sawSuccess = true
       } catch {
         payload = null
       }
@@ -70,14 +72,17 @@ export default function AdminPanel() {
       let versionPayload = null
       try {
         healthPayload = payload ? null : await apiGet('/health')
+        if (!payload) sawSuccess = true
       } catch {
         healthPayload = null
       }
       try {
         versionPayload = await apiGet('/version')
+        sawSuccess = true
       } catch {
         versionPayload = null
       }
+      if (!sawSuccess) throw new Error('all probes failed')
       const checkedAt = Date.now()
       setProbe({ checking: false, online: true, latencyMs, error: null, checkedAt })
       setStatus(payload)
@@ -304,7 +309,7 @@ export default function AdminPanel() {
           <div className="table-wrap">
             <table className="feed-table">
               <thead>
-                <tr><th>Time</th><th>State</th><th>Detail</th></tr>
+                <tr><th scope="col">Time</th><th scope="col">State</th><th scope="col">Detail</th></tr>
               </thead>
               <tbody>
                 {events.map((e, i) => (

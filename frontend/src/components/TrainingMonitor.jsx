@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import axios from 'axios'
-import { API_URL } from '../api'
+import { apiGet } from '../api'
 import { JobStatus } from './TrainingJobsList'
 
+const fmtMetric = (fn) => (v) => (typeof v === 'number' && Number.isFinite(v) ? fn(v) : '—')
+
 const METRIC_LABELS = [
-  ['train_loss', 'Training loss', (v) => v.toFixed(4)],
-  ['auc', 'AUC', (v) => v.toFixed(4)],
-  ['accuracy', 'Accuracy', (v) => `${(v * 100).toFixed(1)}%`],
-  ['precision', 'Precision', (v) => `${(v * 100).toFixed(1)}%`],
-  ['recall', 'Recall', (v) => `${(v * 100).toFixed(1)}%`],
-  ['val_accuracy', 'Validation accuracy', (v) => `${(v * 100).toFixed(1)}%`],
+  ['train_loss', 'Training loss', fmtMetric((v) => v.toFixed(4))],
+  ['auc', 'AUC', fmtMetric((v) => v.toFixed(4))],
+  ['accuracy', 'Accuracy', fmtMetric((v) => `${(v * 100).toFixed(1)}%`)],
+  ['precision', 'Precision', fmtMetric((v) => `${(v * 100).toFixed(1)}%`)],
+  ['recall', 'Recall', fmtMetric((v) => `${(v * 100).toFixed(1)}%`)],
+  ['val_accuracy', 'Validation accuracy', fmtMetric((v) => `${(v * 100).toFixed(1)}%`)],
 ]
 
 export default function TrainingMonitor() {
@@ -23,13 +24,13 @@ export default function TrainingMonitor() {
     let timer
     const load = async () => {
       try {
-        const res = await axios.get(`${API_URL}/training/${jobId}`)
+        const data = await apiGet(`/training/${encodeURIComponent(jobId)}`)
         if (!alive) return
-        setJob(res.data)
+        setJob(data)
         setError(null)
-        if (res.data.status !== 'completed' && res.data.status !== 'failed') timer = setTimeout(load, 2000)
+        if (data.status !== 'completed' && data.status !== 'failed') timer = setTimeout(load, 2000)
       } catch (err) {
-        if (alive) setError(err.response?.data?.detail || err.message)
+        if (alive) setError(err.message)
       }
     }
     load()

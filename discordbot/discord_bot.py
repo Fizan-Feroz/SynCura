@@ -10,7 +10,10 @@ load_dotenv()
 
 # --- CONFIG ---
 DISCORD_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "").strip()
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "1350529155598520413"))
+_channel_raw = os.getenv("DISCORD_CHANNEL_ID", "").strip()
+if not _channel_raw.isdigit():
+    raise RuntimeError("DISCORD_CHANNEL_ID must be set to a numeric channel id (no default committed)")
+CHANNEL_ID = int(_channel_raw)
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "")
 
 # Try to parse webhook id from webhook URL (format: /api/webhooks/<id>/<token>)

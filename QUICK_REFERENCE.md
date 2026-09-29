@@ -10,9 +10,8 @@ npm install
 
 ### 2. Start Services
 ```bash
-# Terminal 1: Backend
-cd backend
-python -m uvicorn app:app --reload --port 8000
+# Terminal 1: Backend (from the repo root — the ml/ imports need it)
+python -m uvicorn backend.app:app --reload --port 8000
 
 # Terminal 2: Frontend
 cd frontend
@@ -133,11 +132,11 @@ ionerdstechfusion/
 
 ### Backend Management
 ```bash
-# Start backend (development)
-python -m uvicorn app:app --reload --port 8000
+# Start backend (development, from the repo root)
+python -m uvicorn backend.app:app --reload --port 8000
 
 # Start backend (production)
-python -m uvicorn app:app --host 0.0.0.0 --port 8000
+python -m uvicorn backend.app:app --host 0.0.0.0 --port 8000
 
 # Test backend health
 curl http://localhost:8000/health

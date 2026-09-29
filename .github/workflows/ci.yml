@@ -16,6 +16,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
           pip install -r ml/requirements.txt
+          pip install -r discordbot/requirements.txt
+          pip install -r chatbot-tele/requirements.txt
           pip install pytest httpx
       - name: Compile check
         run: python -m compileall -q backend ml scripts discordbot chatbot-tele
@@ -35,4 +37,9 @@ jobs:
         run: |
           cd frontend
           npm ci
+          npm run build
+      - name: Production build (internal training UI enabled)
+        run: |
+          cd frontend
+          $env:VITE_ENABLE_TRAINING = 'true'
           npm run build

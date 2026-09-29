@@ -12,22 +12,19 @@ This file is the up-to-date orientation doc. `AGENTS.md` also exists but describ
 
 - **12 features**, **90-minute window**, config name `f12-h96-w90` (12 features, hidden=96, window=90).
 - Features: `HR, RespRate, Temp, NISysABP, NIDiasABP, SpO2, GCS, BUN, Creatinine, WBC, Platelets, Glucose`.
-- AUC 0.798, accuracy 0.771, recall 0.681, precision 0.375 (11 epochs, early-stopped).
-- Got here via iterative grid search (30+ configs, 5 rounds) — see commit `a491e11` for the full story:
+- Headline (one-time locked holdout, never trained/selected on): AUC **0.828**, accuracy 0.770, recall 0.773, precision 0.314 — see `ml/LOCKED_EVAL_20260926.json`.
+- Deployed ensemble `s48+c93+s45` (`ml/deployed_manifest.json`): val 0.840, fresh holdout 0.844 — but the holdout guided ensemble selection, so treat those as optimistic; the locked number above is the honest one.
+- Got here via iterative grid search (30+ configs, 25+ rounds) — see `ml/RESULTS_PLAN.md` for the full story:
   6→12 features, window 60→90, hidden 64→96, population normalization, proximity labeling, SaO2→SpO2 alias.
 - `ml/scaler.json` holds the population mean/std from the training split — inference must use these,
-  not per-window stats (that was a fixed bug, see commit `c4203db`).
+  not per-window stats (enforced: `backend/inference.py` refuses to score without them, see commit `c4203db`).
 
-## ⚠️ Known drift: backend/inference.py is NOT in sync with the current model
+## Train/serve contract (resolved — keep it that way)
 
-`backend/inference.py` hardcodes `FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2']`
-(6 features) and `window_size=60`, but `ml/models/lstm_baseline.pt` was last trained with the 12-feature,
-90-minute config above. Loading that checkpoint into a 6-feature `AttentionLSTMModel` will fail or
-silently misbehave. **Before relying on live `/ingest` risk scores, reconcile `FEATURES`/`window_size`
-in `backend/inference.py` (and the SHAP path in `backend/app.py`'s `/explain` endpoint) with whatever
-model is actually in `ml/models/lstm_baseline.pt`.** Always update `ml/train.py` and
-`backend/inference.py` together when changing features or window size — this is the #1 way this
-project breaks silently.
+`backend/inference.py` imports the canonical `SERVING_FEATURES` from `ml/dataset.py`
+(12 features) and serves 90-minute windows, matching the training config above.
+Always update `ml/train.py` and `backend/inference.py` together when changing
+features or window size — this is the #1 way this project breaks silently.
 
 ## Directory map
 
@@ -154,7 +151,7 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 - The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`.
   `ml/train.py`, `backend/inference.py`, and the Challenge 2019 loader import it.
   Do not retype the list; saved scalers whose `features` list differs are rejected.
-- No automated test suite exists yet (backend or ML).
+- Test suite: `backend/tests/` (API, serving/training audit, dataset policy, simulation, eval-locked contracts) — run with `python -m pytest backend/tests/ -q` from the repo root. CI runs it plus the frontend production build.
 - `.env` holds secrets (Discord webhook, etc.) — never print or commit its contents; `.env.example` is the template.
 
 ## Docs already in the repo (read these for depth, this file is the map)
@@ -171,4 +168,3 @@ python backend\replay.py --mode http --url http://localhost:8000/ingest --physio
 - `syncura_review.tex` — the LaTeX review paper (IEEE DISCOVER format, XeLaTeX + A4 + Times New Roman).
 - `ppt/` — presentation decks and speaker scripts. `SynCura_Deck_V3_FINAL.pptx` is the current deck; the `SynCura_PACE_Format*` and `SynCura_Deck_V2/V3` files are earlier iterations. Source facts from `ml/metrics.json` and `ml/deployed_manifest.json` rather than figures quoted inside older decks.
 - `LITERATURE_REVIEW.md` — base paper (Wang, Bai & Jin 2026) + 8 supporting papers, with SynCura's positioning (~0.78–0.93 AUC realistic range vs. richer multi-database systems reaching 0.93–0.97).
-- `zulfapp1 (1) (2).pptx` — academic presentation deck for this project (P.A. College of Engineering, CSE dept). Rebuilt 2026-09-14 to reflect the current SynCura content (12-feature model, AUC 0.798, current architecture) — it previously contained an unrelated mushroom-contamination-detection project's slides by mistake. If asked to update it again, source facts from `ml/metrics.json` and this file rather than the stale figures in `PROJECT_REPORT.md`/`AGENTS.md`.

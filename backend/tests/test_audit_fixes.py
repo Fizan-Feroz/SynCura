@@ -273,7 +273,9 @@ def test_bad_timestamp_falls_back_to_now(engine, ts):
 
 
 def test_reading_without_model_features_is_not_buffered(engine):
-    assert engine.add_vital('mb-empty', {'timestamp': 0, 'EtCO2': 35}) == 0
+    # A reading with no model features yields no score (None, not a fake 0)
+    # and buffers nothing.
+    assert engine.add_vital('mb-empty', {'timestamp': 0, 'EtCO2': 35}) is None
     assert engine.vital_buffer['mb-empty'] == {}
 
 
@@ -535,8 +537,9 @@ def test_explain_uses_scored_input(monkeypatch, tmp_db):
 def test_explain_unknown_patient():
     from fastapi.testclient import TestClient
     import backend.app as app_module
-    body = TestClient(app_module.app).get('/patient/never-seen/explain').json()
-    assert 'error' in body
+    r = TestClient(app_module.app).get('/patient/never-seen/explain')
+    assert r.status_code == 404
+    assert 'never-seen' in r.json()['detail']
 
 
 def test_explain_real_shap_runs(tmp_db):

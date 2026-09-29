@@ -19,9 +19,24 @@ from sklearn.metrics import roc_auc_score, accuracy_score, precision_score, reca
 
 from ml.paths import physionet2012_root as _pn_root
 
+from ml.dataset import SERVING_FEATURES
+
 BASE = _pn_root()
-FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-               'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+FEATURES_12 = SERVING_FEATURES
+
+
+def needs_gap_channels(scaler):
+    """True when a scaler belongs to a 24-dim gap model.
+
+    Gap scalers keep the 12 base feature names but carry 24 mean/std entries
+    (or an explicit gap_channels flag), so checking len(features) > 12 never
+    fires — this helper checks what actually determines the width.
+    """
+    if not isinstance(scaler, dict):
+        return False
+    if scaler.get('gap_channels'):
+        return True
+    return len(scaler.get('mean', [])) > 12
 
 
 def main():
@@ -40,7 +55,7 @@ def main():
     need_gap = False
     for scpath in cand['scalers']:
         try:
-            if len(json.load(open(scpath)).get('features', [])) > 12:
+            if needs_gap_channels(json.load(open(scpath))):
                 need_gap = True
         except Exception:
             pass
@@ -62,7 +77,11 @@ def main():
     for ckpt, scpath, cls in zip(cand['checkpoints'], cand['scalers'], classes):
         sc = json.load(open(scpath))
         mean, std = np.array(sc['mean']), np.array(sc['std'])
-        n_feat = len(sc.get('features', FEATURES_12))
+        n_feat = len(mean)
+        if n_feat != X.shape[-1]:
+            raise ValueError(
+                f'scaler {scpath} has {n_feat} stats but windows have {X.shape[-1]} '
+                f'features (gap_channels={need_gap})')
         Xn = ((np.where(np.isnan(X), mean, X) - mean) / std).astype(np.float32)
         ModelCls = AttentionLSTMFusionModel if cls == 'fusion' else AttentionLSTMModel
         m = ModelCls(input_size=n_feat, hidden_size=96, dropout=0.3)

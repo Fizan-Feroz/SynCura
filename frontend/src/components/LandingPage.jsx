@@ -26,11 +26,11 @@ const STEPS = [
 ]
 
 const METRICS = [
-  { name: 'Holdout AUC', value: '0.844', fill: 0.844, note: '20% of PhysioNet set B' },
-  { name: 'Validation AUC', value: '0.840', fill: 0.84, note: 'Patient-level split of set A' },
-  { name: 'Recall', value: '80.7%', fill: 0.807, note: 'Deaths the model flagged' },
-  { name: 'Accuracy', value: '74.7%', fill: 0.747, note: 'At a 0.5 threshold' },
-  { name: 'Precision', value: '34.5%', fill: 0.345, note: 'Flags that were correct' },
+  { name: 'Holdout AUC', value: '0.828', fill: 0.828, note: 'One-time locked holdout (seed 999) — the honest headline' },
+  { name: 'Validation AUC', value: '0.835', fill: 0.835, note: 'Original 1519-patient split, seed 42' },
+  { name: 'Recall', value: '77.3%', fill: 0.773, note: 'Deaths the model flagged (locked holdout)' },
+  { name: 'Accuracy', value: '77.0%', fill: 0.77, note: 'At a 0.5 threshold (locked holdout)' },
+  { name: 'Precision', value: '31.4%', fill: 0.314, note: 'Flags that were correct (locked holdout)' },
 ]
 
 const DESTINATIONS = [

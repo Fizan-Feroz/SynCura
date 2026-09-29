@@ -12,9 +12,10 @@ import torch
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
 from ml.paths import physionet2012_root as _pn_root
+from ml.dataset import SERVING_FEATURES
+
 BASE = _pn_root()
-FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-               'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+FEATURES_12 = SERVING_FEATURES
 COMBO_RUN = 'ml/training_runs/exp_20260917_005359'
 OLD = {
     's48': 'ml/training_runs/exp_20260916_220047/seed48/model.pt',

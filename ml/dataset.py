@@ -61,10 +61,15 @@ def load_physionet_file(file_path, patient_outcome=None):
     df_pivot = df[df['Parameter'] != 'RecordID'].pivot_table(index='Time', columns='Parameter', values='Value')
 
     def time_to_minutes(t):
-        h, m = map(int, t.split(':'))
-        return h * 60 + m
+        try:
+            h, m = str(t).split(':')
+            return int(h) * 60 + int(m)
+        except (ValueError, AttributeError):
+            return None
 
     df_pivot.index = df_pivot.index.map(time_to_minutes)
+    df_pivot = df_pivot[df_pivot.index.notna()]
+    df_pivot.index = df_pivot.index.astype(int)
     df_pivot = df_pivot.sort_index()
     df_pivot.index.name = 'minutes'
 
@@ -115,8 +120,8 @@ def load_physionet_batch(physionet_dir, outcomes_file=None, max_patients=None):
     return data
 
 
-def create_sequences_from_physionet(data_list, vital_features=None, window_minutes=60, stride=1,
-                                    label_mode='all', horizon_hours=12, gap_channels=False):
+def create_sequences_from_physionet(data_list, vital_features=None, window_minutes=90, stride=15,
+                                    label_mode='proximity', horizon_hours=12, gap_channels=False):
     """Convert PhysioNet data list into sequences X, y.
 
     No normalization is applied here on purpose: per-patient z-scoring erases
@@ -149,7 +154,7 @@ def create_sequences_from_physionet(data_list, vital_features=None, window_minut
     interpolation/ffill would otherwise erase. Output is (N, window, 2*F).
     """
     if vital_features is None:
-        vital_features = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP']
+        vital_features = list(SERVING_FEATURES)
 
     X_all = []
     y_all = []
@@ -226,9 +231,9 @@ def create_sequences_from_physionet(data_list, vital_features=None, window_minut
     patient_ids = np.array(patient_ids)
     return X, y, patient_ids
 
-
-def load_and_create_sequences(physionet_dir, outcomes_file=None, vital_features=None, window_minutes=60, max_patients=None, stride=1,
-                                label_mode='all', horizon_hours=12, gap_channels=False):
+def load_and_create_sequences(physionet_dir, outcomes_file=None, vital_features=None, 
+window_minutes=90, max_patients=None, stride=15,
+                                label_mode='proximity', horizon_hours=12, gap_channels=False):
     """All-in-one: load PhysioNet directory and create training sequences."""
     data_list = load_physionet_batch(physionet_dir, outcomes_file, max_patients)
     X, y, patient_ids = create_sequences_from_physionet(data_list, vital_features, window_minutes, stride,

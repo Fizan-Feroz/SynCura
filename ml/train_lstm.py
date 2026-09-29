@@ -20,18 +20,21 @@ class SimpleLSTMDataset(Dataset):
 
 
 class LSTMModel(nn.Module):
-    """Original plain LSTM model (kept for backward compatibility)."""
+    """Original plain LSTM model (kept for backward compatibility).
+
+    forward() returns raw logits like AttentionLSTMModel: train with
+    BCEWithLogitsLoss and apply sigmoid only at inference time.
+    """
     def __init__(self, input_size, hidden_size=64, num_layers=2):
         super().__init__()
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, 1)
-        self.sig = nn.Sigmoid()
 
     def forward(self, x):
         out, _ = self.lstm(x)
         out = out[:, -1, :]
         out = self.fc(out)
-        return self.sig(out).squeeze(-1)
+        return out.squeeze(-1)
 
 
 class AttentionLSTMModel(nn.Module):
@@ -247,9 +250,11 @@ def train(
 
 
 if __name__ == '__main__':
-    # quick smoke test with random data
+    # quick smoke test with random data (writes only to a temp dir, never the repo)
+    import tempfile
     X = np.random.randn(200, 60, 6)
     y = (np.random.rand(200) > 0.8).astype(float)
     model, _ = train(X, y, epochs=2)
-    torch.save(model.state_dict(), 'ml/lstm_baseline.pt')
-    print('Saved ml/lstm_baseline.pt')
+    with tempfile.TemporaryDirectory() as tmp:
+        torch.save(model.state_dict(), f'{tmp}/smoke.pt')
+    print('Smoke test OK')

@@ -12,14 +12,17 @@ import torch
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.paths import physionet2012_root as _pn_root
+
+BASE = _pn_root()
 TRAIN_DIR = os.path.join(BASE, "set-a_full", "set-a")
 TRAIN_OUTCOMES = os.path.join(BASE, "Outcomes-a.txt")
 HOLDOUT_DIR = os.path.join(BASE, "set-b_full", "set-b")
 HOLDOUT_OUTCOMES = os.path.join(BASE, "Outcomes-b.txt")
 
-FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-               'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+from ml.dataset import SERVING_FEATURES
+
+FEATURES_12 = SERVING_FEATURES
 WARM_START = os.path.join('ml', 'models', 'lstm_baseline.pt')
 BASELINE_VAL = 0.7978
 BASELINE_HOLDOUT = 0.7640

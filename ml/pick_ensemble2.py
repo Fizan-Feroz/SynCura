@@ -10,9 +10,11 @@ import torch
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.metrics import roc_auc_score, accuracy_score, recall_score
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
-FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-               'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+from ml.dataset import SERVING_FEATURES
+from ml.paths import physionet2012_root as _pn_root
+
+BASE = _pn_root()
+FEATURES_12 = SERVING_FEATURES
 BASE_VAL = 0.8371
 BASE_HO = 0.8073
 STEP_HO = 0.8000

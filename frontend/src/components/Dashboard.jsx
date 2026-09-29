@@ -19,7 +19,8 @@ function fmtVital(value, digits = 0) {
 }
 
 function hasDeteriorationEvent(p) {
-  return p.vitals.SpO2 <= 90 || p.vitals.Resp >= 30 || p.vitals.Temp >= 39.2 || p.risk >= 88
+  const v = p.vitals || {}
+  return v.SpO2 <= 90 || v.Resp >= 30 || v.Temp >= 39.2 || p.risk >= 88
 }
 
 function classificationStats(rows) {
@@ -38,6 +39,7 @@ function classificationStats(rows) {
 }
 
 function RiskRing({ value, size = 56 }) {
+  const v = Number.isFinite(value) ? value : 0
   const r = 24
   const c = 2 * Math.PI * r
   return (
@@ -50,10 +52,10 @@ function RiskRing({ value, size = 56 }) {
           cy="28"
           r={r}
           strokeDasharray={c}
-          strokeDashoffset={c * (1 - clamp(value, 0, 100) / 100)}
+          strokeDashoffset={c * (1 - clamp(v, 0, 100) / 100)}
         />
       </svg>
-      <span className="risk-ring-num num">{value}</span>
+      <span className="risk-ring-num num">{Number.isFinite(value) ? value : '—'}</span>
     </span>
   )
 }
@@ -70,17 +72,18 @@ function Readout({ label, value, unit, color, big = false }) {
   )
 }
 
-function BedTile({ patient, selected, onSelect, threshold }) {
+function BedTile({ patient, onSelect, threshold }) {
+  const vitals = patient.vitals || {}
+  const waveform = Array.isArray(patient.waveform) ? patient.waveform : []
   const tone = riskTone(patient.risk)
-  const trend = seriesPath(patient.waveform, 200, 44, 3, [0, 100])
+  const trend = seriesPath(waveform, 200, 44, 3, [0, 100])
   const over = patient.risk >= threshold
   return (
     <li className="bed" data-flip-id={patient.patient_id}>
       <button
         type="button"
-        className={`bed-tile tone-${tone} ${selected ? 'is-selected' : ''} ${over ? 'is-over' : ''}`}
+        className={`bed-tile tone-${tone} ${over ? 'is-over' : ''}`}
         onClick={() => onSelect(patient.patient_id)}
-        aria-pressed={selected}
         aria-label={`${patient.bed}, patient ${patient.patient_id}, risk ${patient.risk} percent, ${riskLabel(patient.risk)}. Open profile.`}
       >
         <span className="bed-head">
@@ -89,10 +92,10 @@ function BedTile({ patient, selected, onSelect, threshold }) {
         </span>
         <span className="bed-body">
           <span className="bed-readouts">
-            <Readout label="HR" value={fmtVital(patient.vitals.HR)} color="var(--hr)" />
-            <Readout label="SpO2" value={fmtVital(patient.vitals.SpO2)} color="var(--spo2)" />
-            <Readout label="RR" value={fmtVital(patient.vitals.Resp)} color="var(--rr)" />
-            <Readout label="T" value={fmtVital(patient.vitals.Temp, 1)} color="var(--temp)" />
+            <Readout label="HR" value={fmtVital(vitals.HR)} color="var(--hr)" />
+            <Readout label="SpO2" value={fmtVital(vitals.SpO2)} color="var(--spo2)" />
+            <Readout label="RR" value={fmtVital(vitals.Resp)} color="var(--rr)" />
+            <Readout label="T" value={fmtVital(vitals.Temp, 1)} color="var(--temp)" />
           </span>
           <RiskRing value={patient.risk} />
         </span>
@@ -136,10 +139,22 @@ export default function Dashboard({ theme, onToggleTheme }) {
   const [metricsError, setMetricsError] = useState(false)
 
   useEffect(() => {
-    fetch(`${API_URL}/metrics`)
+    let alive = true
+    const controller = new AbortController()
+    fetch(`${API_URL}/metrics`, { signal: controller.signal })
       .then((r) => r.json())
-      .then((d) => (d.error ? setMetricsError(true) : setMetrics(d)))
-      .catch(() => setMetricsError(true))
+      .then((d) => {
+        if (!alive) return
+        if (d.error) setMetricsError(true)
+        else setMetrics(d)
+      })
+      .catch(() => {
+        if (alive) setMetricsError(true)
+      })
+    return () => {
+      alive = false
+      controller.abort()
+    }
   }, [])
 
   // Ranking: re-sorted every few seconds rather than on every tick, the way a
@@ -206,7 +221,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
     return (lead.reduce((s, v) => s + v, 0) / Math.max(1, lead.length)).toFixed(1)
   }, [patientQueue])
 
-  const fmt = (v, pct = true) => (v == null ? 'n/a' : pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(3))
+  const fmt = (v, pct = true) => (!Number.isFinite(v) ? 'n/a' : pct ? `${(v * 100).toFixed(1)}%` : v.toFixed(3))
 
   if (!backendOnline && source !== 'demo') {
     return (
@@ -390,13 +405,13 @@ export default function Dashboard({ theme, onToggleTheme }) {
             <h2 id="beds-title" className="sr-only">Beds ranked by risk</h2>
             <ol className="beds" ref={gridRef}>
               {ranked.map((p) => (
-                <BedTile key={p.patient_id} patient={p} selected={false} onSelect={(id) => navigate(`/bed/${id}`)} threshold={threshold} />
+                <BedTile key={p.patient_id} patient={p} onSelect={(id) => navigate(`/bed/${id}`)} threshold={threshold} />
               ))}
             </ol>
           </section>
 
           <aside className="station-rail">
-            <section className="rail-block" aria-labelledby="alerts-title" aria-live="polite">
+            <section className="rail-block" aria-labelledby="alerts-title" aria-live="off">
               <div className="rail-head">
                 <h2 id="alerts-title">Alerts</h2>
                 <span className="num muted">{alerts.length}</span>

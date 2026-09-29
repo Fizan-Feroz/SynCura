@@ -67,6 +67,9 @@ if (-not $SkipVenv) {
     
     Write-Host "  • Installing ML dependencies..."
     pip install -q -r ml\requirements.txt
+
+    Write-Host "  • Installing Discord bot dependencies..."
+    pip install -q -r discordbot\requirements.txt
     
     Write-Host "  ✓ Python environment ready" -ForegroundColor Green
 } else {

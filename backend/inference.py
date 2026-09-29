@@ -12,15 +12,30 @@ scaler.
 import os
 import glob
 import json
+import logging
 import math
 import time
 import threading
-import warnings
 
 import numpy as np
 import torch
 
 from ml.dataset import SERVING_FEATURES, carry_forward
+
+logger = logging.getLogger('syncura.inference')
+
+
+def _env_float(name, default, minimum=None):
+    """Read a float env var defensively: bad values fall back to the default."""
+    try:
+        value = float(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        logger.warning('Invalid %s; using default %s', name, default)
+        return default
+    if minimum is not None and value < minimum:
+        logger.warning('Invalid %s=%s; clamping to %s', name, value, minimum)
+        return minimum
+    return value
 
 
 # Determine model path: allow override via MODEL_PATH env var, check common paths,
@@ -31,7 +46,11 @@ if not os.path.exists(DEFAULT_MODEL_PATH):
     if os.path.exists(alt):
         DEFAULT_MODEL_PATH = alt
     else:
-        runs = sorted(glob.glob('ml/training_runs/*/model.pt'), key=os.path.getmtime, reverse=True)
+        try:
+            runs = sorted(glob.glob('ml/training_runs/*/model.pt'), key=os.path.getmtime, reverse=True)
+        except OSError as e:
+            logger.warning('Could not scan training runs for a fallback model: %s', e)
+            runs = []
         if runs:
             DEFAULT_MODEL_PATH = runs[0]
 
@@ -56,19 +75,24 @@ MANIFEST_PATH = os.path.join('ml', 'deployed_manifest.json')
 DEFAULT_SCALER_PATH = os.path.join('ml', 'scaler.json')
 
 # Patients with no reading for this long are dropped from memory.
-PATIENT_TTL_SECONDS = float(os.getenv('PATIENT_TTL_SECONDS', str(6 * 3600)))
+PATIENT_TTL_SECONDS = _env_float('PATIENT_TTL_SECONDS', 6 * 3600, minimum=60.0)
 _EVICT_INTERVAL_SECONDS = 60.0
 
 
 def canonicalize_vital(vital_dict):
     """Return a copy of `vital_dict` with alias keys mapped to model feature names.
 
-    A canonical key that is already present always wins over an alias.
+    A canonical key that is already present always wins over an alias — unless
+    it holds NaN, in which case the alias value fills the gap instead of
+    blocking it.
     """
     out = {k: v for k, v in vital_dict.items() if FEATURE_ALIASES.get(str(k).lower()) in (None, k)}
     for k, v in vital_dict.items():
         canon = FEATURE_ALIASES.get(str(k).lower())
-        if canon and canon != k and out.get(canon) is None:
+        if not canon or canon == k:
+            continue
+        current = out.get(canon)
+        if current is None or (isinstance(current, float) and math.isnan(current)):
             out[canon] = v
     return out
 
@@ -150,9 +174,12 @@ class RiskScoreEngine:
                 with open(scaler_path) as f:
                     scaler = json.load(f)
                 self.set_normalization_stats(scaler['mean'], scaler['std'])
-                print(f'[Inference] Loaded scaler stats from {scaler_path}')
+                logger.info('[Inference] Loaded scaler stats from %s', scaler_path)
             except Exception as e:
-                print(f'[Inference] Warning: failed to load scaler: {e}')
+                self.load_error = f'failed to load scaler {scaler_path}: {e}'
+                self.degraded = True
+                logger.warning('[Inference] %s; scores will be refused, not silently renormalized',
+                               self.load_error)
 
     def _load_model(self):
         """Load the manifest ensemble, else an ensemble dir, else a single model."""
@@ -178,14 +205,17 @@ class RiskScoreEngine:
                     try:
                         self.member_scalers.append(_load_json_scaler(member['scaler'], member['id']))
                     except Exception as e:
-                        print(f"[Inference] Warning: scaler load failed for {member['id']}: {e}")
+                        self.load_error = f'scaler load failed for {member["id"]}: {e}'
+                        self.degraded = True
+                        logger.warning('[Inference] %s; member falls back to shared stats',
+                                       self.load_error)
                         self.member_scalers.append((None, None))
                 self.model = self.models[0]  # primary (attention weights source)
-                print(f'[Inference] Loaded manifest ensemble of {len(self.models)} models')
+                logger.info('[Inference] Loaded manifest ensemble of %d models', len(self.models))
                 return
             except Exception as e:
                 self.load_error = f'manifest ensemble load failed: {e}'
-                print(f'[Inference] Warning: {self.load_error}; falling back')
+                logger.warning('[Inference] %s; falling back', self.load_error)
                 self.models, self.member_scalers, self.model = [], [], None
 
         # Ensemble dir: ml/models/ensemble/*.pt, logits averaged.
@@ -200,27 +230,28 @@ class RiskScoreEngine:
                     self.models.append(m)
                     self.member_scalers.append((None, None))
                 self.model = self.models[0]
-                print(f'[Inference] Loaded ensemble of {len(self.models)} models from {ens_dir}')
+                logger.info('[Inference] Loaded ensemble of %d models from %s', len(self.models), ens_dir)
                 return
             except Exception as e:
                 self.load_error = f'ensemble load failed: {e}'
-                print(f'[Inference] Warning: {self.load_error}; falling back to single model')
+                logger.warning('[Inference] %s; falling back to single model', self.load_error)
                 self.models, self.member_scalers, self.model = [], [], None
 
-        # Single model (previously unreachable dead code after a return).
+        # Single model fallback.
         if os.path.exists(self.model_path):
             try:
                 m = AttentionLSTMModel(input_size=len(FEATURES), hidden_size=96)
                 m.load_state_dict(_load_state(self.model_path))
                 m.eval()
                 self.model = m
-                print(f'[Inference] Loaded AttentionLSTM from {self.model_path} ({len(FEATURES)} features)')
+                logger.info('[Inference] Loaded AttentionLSTM from %s (%d features)',
+                            self.model_path, len(FEATURES))
             except Exception as e:
                 self.load_error = f'single model load failed: {e}'
-                print(f'[Inference] Warning: {self.load_error}')
+                logger.warning('[Inference] %s', self.load_error)
                 self.model = None
         else:
-            print(f'[Inference] Model not found at {self.model_path}; scores unavailable')
+            logger.warning('[Inference] Model not found at %s; scores unavailable', self.model_path)
             self.model = None
 
     def _manifest(self):
@@ -229,7 +260,7 @@ class RiskScoreEngine:
                 with open(self.manifest_path) as f:
                     return json.load(f)
             except Exception as e:
-                print(f'[Inference] Warning: failed to read manifest: {e}')
+                logger.warning('[Inference] Failed to read manifest: %s', e)
         return None
 
     def _manifest_members(self):
@@ -240,9 +271,14 @@ class RiskScoreEngine:
             if need != len(FEATURES):
                 # Fail fast with a clear message (e.g. a 24-dim gap model
                 # cannot be served by the 12-feature engine yet; see
-                # ml/RESULTS_PLAN.md "Serving work required").
-                print(f'[Inference] Warning: manifest needs input_size={need} but engine '
-                      f'builds {len(FEATURES)}-dim vectors; using directory scan')
+                # ml/RESULTS_PLAN.md "Serving work required"). Do NOT fall
+                # back to a directory scan here: silently serving stale or
+                # wrong checkpoints is worse than refusing with load_error.
+                self.load_error = (
+                    f'manifest needs input_size={need} but engine builds '
+                    f'{len(FEATURES)}-dim vectors')
+                self.degraded = True
+                logger.warning('[Inference] %s', self.load_error)
                 return None
             members = [m for m in manifest['members']
                        if os.path.exists(m.get('checkpoint', ''))]
@@ -252,10 +288,12 @@ class RiskScoreEngine:
                     for member in members:
                         _load_json_scaler(member['scaler'], member['id'])
                 except Exception as e:
-                    print(f'[Inference] Warning: manifest scaler incompatible: {e}; using directory scan')
+                    self.load_error = f'manifest scaler incompatible: {e}'
+                    self.degraded = True
+                    logger.warning('[Inference] %s', self.load_error)
                     return None
                 return members
-            print('[Inference] Warning: manifest checkpoints missing; using directory scan')
+            logger.warning('[Inference] Manifest checkpoints missing; using directory scan')
         return None
 
     def _manifest_arch(self):
@@ -353,7 +391,7 @@ class RiskScoreEngine:
             window = self._window_locked(patient_id)
 
         if window is None:
-            return 0
+            return None
         # Model inference runs OUTSIDE the lock so one slow patient cannot
         # block ingestion for every other patient.
         risk_score = self._score_window(window)
@@ -365,18 +403,18 @@ class RiskScoreEngine:
     # ------------------------------------------------------------ preprocessing
 
     def _prepare(self, window, mean=None, std=None):
-        """(raw window, carried-in values) -> normalized float32 model input (window_size, F)."""
+        """(raw window, carried-in values) -> normalized float32 model input (window_size, F).
+
+        Raises ValueError when no population stats exist at all: silently
+        falling back to per-window z-scoring would score with a different
+        normalization than training used.
+        """
         raw, initial = window
         X = carry_forward(raw, initial)
         if mean is None or std is None:
             mean, std = self._train_mean, self._train_std
         if mean is None or std is None:
-            # No population stats at all: per-window z-score, unobserved -> 0.
-            with warnings.catch_warnings():
-                warnings.simplefilter('ignore', RuntimeWarning)
-                mu = np.nanmean(X, axis=0)
-                sd = np.nanstd(X, axis=0) + 1e-6
-            return np.nan_to_num((X - mu) / sd).astype(np.float32)
+            raise ValueError('no population normalization stats available')
         X = np.where(np.isnan(X), mean, X)
         return ((X - mean) / std).astype(np.float32)
 
@@ -389,15 +427,16 @@ class RiskScoreEngine:
     def _score_window(self, window):
         """Score a raw window. Returns int 0-100, or None on failure."""
         if self.model is None and not self.models:
-            self.degraded = True
+            with self.lock:
+                self.degraded = True
             return None
         try:
             with torch.inference_mode():
                 logits = [m(torch.from_numpy(X[None])).item() for m, X in self._member_inputs(window)]
             prob = 1.0 / (1.0 + math.exp(-sum(logits) / len(logits)))
             return max(0, min(100, round(prob * 100)))
-        except Exception as e:
-            print(f'[Inference] Error computing score: {e}')
+        except Exception:
+            logger.exception('[Inference] Error computing score')
             return None
 
     def get_model_input(self, patient_id):
@@ -407,7 +446,11 @@ class RiskScoreEngine:
         if window is None or self.model is None:
             return None
         mean, std = self.member_scalers[0] if self.member_scalers else (None, None)
-        return self._prepare(window, mean, std)
+        try:
+            return self._prepare(window, mean, std)
+        except ValueError as e:
+            logger.warning('[Inference] Cannot build model input for %s: %s', patient_id, e)
+            return None
 
     def get_attention_weights(self, patient_id):
         """Get attention weights for a patient's current window (for explainability)."""
@@ -418,8 +461,8 @@ class RiskScoreEngine:
             with torch.inference_mode():
                 weights = self.model.get_attention_weights(torch.from_numpy(X[None]))
             return weights.squeeze(0).numpy().tolist()
-        except Exception as e:
-            print(f'[Inference] Error getting attention weights for {patient_id}: {e}')
+        except Exception:
+            logger.exception('[Inference] Error getting attention weights for %s', patient_id)
             return None
 
     def get_risk_score(self, patient_id):

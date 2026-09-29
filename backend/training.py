@@ -131,17 +131,20 @@ class TrainingManager:
         """Create a new training job (collision-free UUID)."""
         job_id = f"job_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
         job = TrainingJob(job_id, config)
-        self.jobs[job_id] = job
-        self._save_store()
+        with self._lock:
+            self.jobs[job_id] = job
+            self._save_store()
         return job
-    
+
     def get_job(self, job_id: str) -> Optional[TrainingJob]:
         """Get a training job by ID"""
-        return self.jobs.get(job_id)
-    
+        with self._lock:
+            return self.jobs.get(job_id)
+
     def get_all_jobs(self) -> List[Dict]:
         """Get all jobs"""
-        return [job.to_dict() for job in self.jobs.values()]
+        with self._lock:
+            return [job.to_dict() for job in self.jobs.values()]
     
     def start_training(self, job_id: str):
         """Start training for a job (runs in background thread)"""
@@ -264,8 +267,9 @@ class TrainingManager:
         finally:
             with self._lock:
                 self.active_job = None
-                # Save to history
+                # Save to history (capped; the store is rewritten every epoch)
                 self.history.append(job.to_dict())
+                del self.history[:-50]
             self._save_store()
 
     def _training_progress_callback(self, job: TrainingJob):

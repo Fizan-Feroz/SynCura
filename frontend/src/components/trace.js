@@ -37,12 +37,14 @@ export function ecgPath({ x0 = 0, x1 = 1000, base = 100, amp = 70, beats = 8, ji
 
 /** Smooth path through data values scaled into a width x height box. */
 export function seriesPath(values, width, height, pad = 4, domain) {
-  if (!values.length) return ''
-  const min = domain ? domain[0] : Math.min(...values)
-  const max = domain ? domain[1] : Math.max(...values)
+  if (!Array.isArray(values) || !values.length) return ''
+  const nums = values.filter((v) => Number.isFinite(v))
+  if (!nums.length) return ''
+  const min = domain ? domain[0] : Math.min(...nums)
+  const max = domain ? domain[1] : Math.max(...nums)
   const range = max - min || 1
-  const step = (width - pad * 2) / Math.max(1, values.length - 1)
-  const pts = values.map((v, i) => [pad + i * step, pad + (height - pad * 2) * (1 - (v - min) / range)])
+  const step = (width - pad * 2) / Math.max(1, nums.length - 1)
+  const pts = nums.map((v, i) => [pad + i * step, pad + (height - pad * 2) * (1 - (v - min) / range)])
   let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`
   for (let i = 1; i < pts.length; i++) {
     const [px, py] = pts[i - 1]

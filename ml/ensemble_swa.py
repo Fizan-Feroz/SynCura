@@ -18,14 +18,16 @@ import torch
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.dataset import SERVING_FEATURES
+from ml.paths import physionet2012_root as _pn_root
+
+BASE = _pn_root()
 TRAIN_DIR = os.path.join(BASE, "set-a")          # 1519-patient set used by all checkpoints
 TRAIN_OUTCOMES = os.path.join(BASE, "Outcomes-a.txt")
 HOLDOUT_DIR = os.path.join(BASE, "set-b_full", "set-b")
 HOLDOUT_OUTCOMES = os.path.join(BASE, "Outcomes-b.txt")
 
-FEATURES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-            'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+FEATURES = SERVING_FEATURES
 WINDOW = 90
 STRIDE = 15
 

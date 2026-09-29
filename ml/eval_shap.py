@@ -27,7 +27,7 @@ def explain_sample(model, X_sample):
     def f(x):
         with torch.no_grad():
             t = torch.tensor(x.reshape(-1, X_sample.shape[1], X_sample.shape[2]), dtype=torch.float32)
-            return model(t).numpy()
+            return torch.sigmoid(model(t)).numpy()  # model returns logits
 
     # Use the sample data itself as background (better than zeros)
     background = X_sample[:min(10, len(X_sample))]

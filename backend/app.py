@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 import json
 import logging
+import glob
 import os
 import platform
 import threading
@@ -11,6 +12,7 @@ import queue
 import requests
 import time
 from collections import deque
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from dotenv import load_dotenv
 
@@ -22,19 +24,25 @@ DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL", "").strip()
 
 try:
     from backend.dashboard import DASHBOARD_HTML
-    from backend.db import init_db, insert_vital, get_latest_vitals, get_top_patients
+    from backend.db import init_db, insert_vital, get_latest_vitals, get_top_patients, purge_old_vitals
     from backend.inference import get_engine, FEATURES
     from backend.simulation import get_sim_engine
     from backend.training import training_manager
 except ImportError:
     from dashboard import DASHBOARD_HTML
-    from db import init_db, insert_vital, get_latest_vitals, get_top_patients
+    from db import init_db, insert_vital, get_latest_vitals, get_top_patients, purge_old_vitals
     from inference import get_engine, FEATURES
     from simulation import get_sim_engine
     from training import training_manager
 
 app = FastAPI()
 init_db()
+try:
+    _purged = purge_old_vitals()
+    if _purged:
+        logging.getLogger("syncura.alerts").info("Purged %d old vitals rows at startup", _purged)
+except Exception as e:
+    logging.getLogger("syncura.alerts").warning("Startup vitals purge failed: %s", e)
 logger = logging.getLogger("syncura.alerts")
 logger.setLevel(logging.INFO)
 if not logger.handlers:
@@ -64,7 +72,7 @@ inference_engine = get_engine()
 # Shared scenario engine: every browser sees the same beds. Ticks score real
 # model risk via the inference engine; patient ids are sim-namespaced.
 sim_engine = get_sim_engine()
-sim_engine.scorer = lambda pid, vitals: inference_engine.add_vital(pid, vitals)
+sim_engine.set_scorer(lambda pid, vitals: inference_engine.add_vital(pid, vitals))
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 START_TIME = time.time()
 INGEST_COUNT = 0
@@ -72,9 +80,25 @@ LAST_INGEST_TIME = None
 # Timestamps of recent ingests (capped) for throughput rates. Guarded by _INGEST_LOCK.
 _INGEST_TIMES = deque(maxlen=1200)
 _INGEST_LOCK = threading.Lock()
-ALERT_COOLDOWN_SECONDS = int(os.getenv("ALERT_COOLDOWN_SECONDS", "120"))
+def _env_int(name, default, minimum=None, maximum=None):
+    """Read an int env var defensively: bad values fall back to the default."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except (TypeError, ValueError):
+        logger.warning("Invalid %s; using default %s", name, default)
+        return default
+    if minimum is not None and value < minimum:
+        logger.warning("Invalid %s=%s; clamping to %s", name, value, minimum)
+        return minimum
+    if maximum is not None and value > maximum:
+        logger.warning("Invalid %s=%s; clamping to %s", name, value, maximum)
+        return maximum
+    return value
+
+
+ALERT_COOLDOWN_SECONDS = _env_int("ALERT_COOLDOWN_SECONDS", 120, minimum=1)
 # Minimum risk required to send risk-based Discord alerts (0-100)
-MIN_DISCORD_RISK = int(os.getenv("MIN_DISCORD_RISK", "90"))
+MIN_DISCORD_RISK = _env_int("MIN_DISCORD_RISK", 90, minimum=0, maximum=100)
 
 # Internal cache for last-sent timestamps (ingest runs on a threadpool)
 _last_alert_sent = {}
@@ -82,6 +106,9 @@ _alert_lock = threading.Lock()
 
 # Key used when applying a per-patient cooldown (aggregate alerts)
 _PATIENT_COOLDOWN_KEY = "__patient_alert__"
+
+# Bounded pool for Discord webhook posts (see _dispatch_live_alerts).
+_ALERT_POOL = ThreadPoolExecutor(max_workers=2, thread_name_prefix="discord-alert")
 
 
 def _read_json_file(path):
@@ -172,6 +199,10 @@ def _should_send_alert(patient_id: str, alert_key: str) -> bool:
     now = time.time()
     cache_key = (patient_id, alert_key)
     with _alert_lock:
+        # Prune expired entries so the cache cannot grow without bound.
+        expired = [k for k, ts in _last_alert_sent.items() if now - ts >= ALERT_COOLDOWN_SECONDS]
+        for k in expired:
+            del _last_alert_sent[k]
         last_sent = _last_alert_sent.get(cache_key, 0)
         if (now - last_sent) < ALERT_COOLDOWN_SECONDS:
             return False
@@ -240,8 +271,9 @@ def _dispatch_discord_live_alerts(vital: dict, risk_score: float):
         return
 
     message = f"[SynCura {highest.upper()}] Patient {patient_id}: " + "; ".join(texts)
-    # Fire in background thread to avoid blocking the request
-    threading.Thread(target=send_discord_alert, args=(message,), daemon=True).start()
+    # Bounded worker pool (not a thread per alert) so a flood of ingests
+    # cannot exhaust threads; the webhook POST has its own 5s timeout.
+    _ALERT_POOL.submit(send_discord_alert, message)
 
 
 class VitalRecord(BaseModel):
@@ -363,7 +395,11 @@ def ingest_vital(vital: VitalRecord):
     vital_dict = vital.model_dump(exclude_none=True)
 
     # Compute risk score via inference engine (None = model missing/failed)
-    risk_score = inference_engine.add_vital(vital_dict['patient_id'], vital_dict)
+    try:
+        risk_score = inference_engine.add_vital(vital_dict['patient_id'], vital_dict)
+    except Exception as e:
+        logger.exception("Ingest scoring failed")
+        raise HTTPException(status_code=503, detail=f"Scoring failed: {e}")
     if risk_score is None:
         raise HTTPException(
             status_code=503,
@@ -373,7 +409,11 @@ def ingest_vital(vital: VitalRecord):
     vital_dict['risk_score'] = risk_score
 
     # Store to database
-    insert_vital(vital_dict)
+    try:
+        insert_vital(vital_dict)
+    except Exception as e:
+        logger.exception("Ingest store failed")
+        raise HTTPException(status_code=500, detail=f"Store failed: {e}")
     global INGEST_COUNT, LAST_INGEST_TIME
     with _INGEST_LOCK:
         now = time.time()
@@ -470,16 +510,23 @@ def replay_sample():
     now = time.time()
     stored = 0
     for bed in snap.get("beds", []):
-        vitals = bed.get("vitals", {})
-        insert_vital({
-            "patient_id": bed.get("patient_id"),
-            "timestamp": now,
-            "HR": vitals.get("HR"),
-            "SpO2": vitals.get("SpO2"),
-            "RespRate": vitals.get("Resp"),
-            "Temp": vitals.get("Temp"),
-            "risk_score": bed.get("risk", 0),
-        })
+        patient_id = bed.get("patient_id")
+        if not patient_id:
+            continue
+        vitals = bed.get("vitals", {}) or {}
+        try:
+            insert_vital({
+                "patient_id": patient_id,
+                "timestamp": now,
+                "HR": vitals.get("HR"),
+                "SpO2": vitals.get("SpO2"),
+                "RespRate": vitals.get("Resp"),
+                "Temp": vitals.get("Temp"),
+                "risk_score": bed.get("risk", 0),
+            })
+        except Exception as e:
+            logger.warning("replay/sample store failed for %s: %s", patient_id, e)
+            continue
         stored += 1
     return {"stored": stored, "source": "simulation-engine-snapshot"}
 
@@ -494,14 +541,19 @@ def get_metrics():
     metrics_path = os.path.join('ml', 'metrics.json')
     if not os.path.exists(metrics_path):
         # Try run directories
-        import glob
         runs = sorted(glob.glob('ml/training_runs/run_*/metrics.json'), key=os.path.getmtime, reverse=True)
         if runs:
             metrics_path = runs[0]
         else:
             return {"error": "No trained model metrics found"}
-    with open(metrics_path) as f:
-        raw = json.load(f)
+    try:
+        with open(metrics_path) as f:
+            raw = json.load(f)
+    except (OSError, ValueError) as e:
+        logger.warning("Failed to read metrics file %s: %s", metrics_path, e)
+        return {"error": f"Metrics file unreadable: {metrics_path}"}
+    if not isinstance(raw, dict):
+        return {"error": f"Metrics file malformed: {metrics_path}"}
     mapped = dict(raw)
     # Prefer the ONE-TIME locked evaluation when present (v5 Step 5: the UI
     # reports the honest number, not the selection-influenced holdout).
@@ -522,10 +574,10 @@ def explain_patient(patient_id: str):
     the explanation cannot disagree with the preprocessing behind the score.
     """
     if inference_engine.model is None:
-        return {"error": "No model loaded"}
+        raise HTTPException(status_code=503, detail="No model loaded")
     X = inference_engine.get_model_input(patient_id)
     if X is None:
-        return {"error": f"No data for patient {patient_id}"}
+        raise HTTPException(status_code=404, detail=f"No data for patient {patient_id}")
 
     attention = inference_engine.get_attention_weights(patient_id)
 
@@ -546,10 +598,27 @@ def explain_patient(patient_id: str):
 
 # ============ TRAINING ENDPOINTS ============
 
+def _require_training_token(request: Request):
+    """Gate expensive training starts when TRAINING_API_TOKEN is set.
+
+    Unset (dev default) keeps the endpoint open so local use and CI are
+    unaffected. Note this is obscurity, not access control: real protection
+    for a public deployment is firewall/VPN, not a header check.
+    """
+    token = os.getenv("TRAINING_API_TOKEN", "").strip()
+    if token and request.headers.get("X-Training-Token", "") != token:
+        raise HTTPException(status_code=401, detail="Training API token required")
+
+
 @app.post("/training/start")
-def start_training(config: TrainingConfig):
+def start_training(config: TrainingConfig, request: Request):
     """Start a new training job with the provided configuration."""
+    _require_training_token(request)
     config_dict = config.model_dump()
+    for key in ("physionet_path", "physionet_dir", "outcomes_path", "outcomes_file"):
+        path = config_dict.get(key)
+        if path and not os.path.exists(path):
+            raise HTTPException(status_code=400, detail=f"Dataset path does not exist: {key}={path}")
     # Enforce the deployment contract: only the 12-feature / 90-min / h96
     # config may be promoted to serving; anything else trains in isolation.
     if (sorted(config_dict.get("vital_features", [])) != sorted(FEATURES)

@@ -1,12 +1,24 @@
+import argparse
 import json
+import os
 import zipfile
 
 import numpy as np
 import pandas as pd
 
 
-ZIP_PATH = r"C:\Users\fizan\Downloads\Techfusion\mimic-iv-clinical-database-demo-2.2.zip"
-OUT_PATH = r"C:\Users\fizan\Downloads\Techfusion\PROJ\frontend\src\mimicDemoPatients.json"
+def default_paths():
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    data_root = os.environ.get("SYNCURA_DATA_ROOT", os.path.join(root, "data"))
+    return (
+        os.path.join(data_root, "mimic-iv-clinical-database-demo-2.2.zip"),
+        os.path.join(root, "frontend", "src", "mimicDemoPatients.json"),
+    )
+
+
+DEFAULT_ZIP_PATH, DEFAULT_OUT_PATH = default_paths()
+ZIP_PATH = DEFAULT_ZIP_PATH
+OUT_PATH = DEFAULT_OUT_PATH
 
 
 def risk_from_vitals(hr: float | None, rr: float | None, temp: float | None, spo2: float | None) -> int:
@@ -135,5 +147,10 @@ def main():
 
 
 if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description="Export MIMIC-IV demo patients to frontend JSON.")
+    ap.add_argument("--zip-path", default=DEFAULT_ZIP_PATH)
+    ap.add_argument("--out-path", default=DEFAULT_OUT_PATH)
+    args = ap.parse_args()
+    ZIP_PATH, OUT_PATH = args.zip_path, args.out_path
     main()
 

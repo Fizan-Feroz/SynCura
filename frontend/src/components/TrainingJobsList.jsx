@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import axios from 'axios'
-import { API_URL } from '../api'
+import { apiGet } from '../api'
 
 export function JobStatus({ status }) {
   const tone = { pending: 'watch', running: 'info', completed: 'stable', failed: 'critical' }[status] || 'watch'
@@ -14,20 +13,26 @@ export default function TrainingJobsList() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
+    let alive = true
     const load = async () => {
       try {
-        const res = await axios.get(`${API_URL}/training/jobs`)
-        setJobs([...res.data.jobs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))))
+        const data = await apiGet('/training/jobs')
+        if (!alive) return
+        setJobs([...data.jobs].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))))
         setError(null)
       } catch (err) {
-        setError(err.response?.data?.detail || err.message)
+        if (!alive) return
+        setError(err.message)
       } finally {
-        setLoading(false)
+        if (alive) setLoading(false)
       }
     }
     load()
     const id = setInterval(load, 3000)
-    return () => clearInterval(id)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
   }, [])
 
   return (

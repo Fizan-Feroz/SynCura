@@ -27,37 +27,53 @@ import requests
 import paho.mqtt.client as mqtt
 import pandas as pd
 
+try:
+    from backend.inference import canonicalize_vital
+except ImportError:
+    try:
+        from inference import canonicalize_vital
+    except ImportError:
+        # Standalone use without the serving package: alias map only.
+        def canonicalize_vital(vital_dict):
+            return {({'SaO2': 'SpO2'}.get(k, k)): v for k, v in vital_dict.items()}
+
 
 def load_physionet_patient(file_path):
     """Load a single PhysioNet patient file and return events as dict list."""
     df = pd.read_csv(file_path)
     patient_id = os.path.basename(file_path).replace('.txt', '')
-    
-    # Pivot: rows=Time, columns=Parameter, values=Value
-    df_pivot = df[df['Parameter'] != 'RecordID'].pivot_table(index='Time', columns='Parameter', values='Value')
-    
+
+    # Pivot: rows=Time, columns=Parameter, values=Value. Duplicate
+    # (Time, Parameter) samples are averaged (explicit aggfunc).
+    df_pivot = df[df['Parameter'] != 'RecordID'].pivot_table(
+        index='Time', columns='Parameter', values='Value', aggfunc='mean')
+
     def time_to_minutes(t):
-        h, m = map(int, t.split(':'))
-        return h * 60 + m
-    
+        try:
+            h, m = str(t).split(':')
+            return int(h) * 60 + int(m)
+        except (ValueError, AttributeError):
+            return None
+
     df_pivot.index = df_pivot.index.map(time_to_minutes)
+    df_pivot = df_pivot[df_pivot.index.notna()]
+    df_pivot.index = df_pivot.index.astype(int)
     df_pivot = df_pivot.sort_index()
-    
+
     for col in df_pivot.columns:
         df_pivot[col] = pd.to_numeric(df_pivot[col], errors='coerce')
-    
-    # Map PhysioNet source names to the inference feature names so replayed
-    # data actually populates the model inputs (e.g. SaO2 -> SpO2).
-    ALIASES = {'SaO2': 'SpO2'}
+
+    # Route events through the serving alias map so renamed PhysioNet columns
+    # are not silently ignored (e.g. SaO2 -> SpO2).
     events = []
     for idx, row in df_pivot.iterrows():
         event = {'patient_id': patient_id, 'timestamp': float(idx) * 60}  # convert to seconds
         for col in df_pivot.columns:
             val = row[col]
             if pd.notna(val):
-                event[ALIASES.get(col, col)] = float(val)
+                event[col] = float(val)
         if len(event) > 2:  # has at least one vital
-            events.append(event)
+            events.append(canonicalize_vital(event))
 
     return events
 

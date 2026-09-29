@@ -88,7 +88,7 @@ export default function SimulatedDataFeed() {
                   <td className="num r">{fmt(p.vitals.Resp)}</td>
                   <td className="num r">{fmt(p.vitals.Temp, 1)}</td>
                   <td>{p.lead}</td>
-                  <td className="num muted">{p.waveform.slice(-6).join('  ')}</td>
+                  <td className="num muted">{Array.isArray(p.waveform) ? p.waveform.slice(-6).join('  ') : '—'}</td>
                 </tr>
               )
             })}

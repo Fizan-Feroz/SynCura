@@ -22,7 +22,7 @@
 
 ## Release
 
-- Website: **v1.8.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
+- Website: **v1.9.0**, sourced from `frontend/package.json` and shown in the top bar and landing footer.
 - Deployed model: `syncura-attention-lstm-ensemble-v1`, per `ml/deployed_manifest.json`.
 - Deployment check: `GET /version` reports the backend’s website version, model, and git commit.
 - Training UI is internal-only: public builds hide it unless built with `VITE_ENABLE_TRAINING=true`.
@@ -231,7 +231,7 @@ P.A. College of Engineering — Department of Computer Science & Engineering:
 ## Limitations (prototype disclaimer)
 
 - Research prototype: retrospective US ICU data (2012), no prospective trial, no fairness/subgroup analysis, no calibration report.
-- Frontend simulation is client-side and does not read back from the backend. Dynamic simulation views require a reachable backend and show a backend-unavailable error otherwise.
+- Frontend beds come from the backend (`Backend live` shared engine or `Replay` ingests), except the explicitly local-only `Demo` source. No live-patient feed anywhere.
 - Explanations (attention/SHAP) describe model behaviour, not proven physiology.
 - Not a medical device. Do not use for clinical decisions.
 

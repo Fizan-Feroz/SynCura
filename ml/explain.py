@@ -8,9 +8,10 @@ import shap
 import torch
 import numpy as np
 
+from ml.dataset import SERVING_FEATURES
 
-FEATURE_NAMES = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-                 'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+
+FEATURE_NAMES = SERVING_FEATURES
 
 
 def compute_shap_explanation(model, patient_sequence, feature_names=None, n_background=20):

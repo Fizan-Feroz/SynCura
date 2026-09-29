@@ -10,12 +10,15 @@ import numpy as np
 import torch
 from sklearn.model_selection import GroupShuffleSplit
 
-BASE = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.paths import physionet2012_root as _pn_root
+
+BASE = _pn_root()
 TRAIN_DIR = os.path.join(BASE, "set-a")
 TRAIN_OUTCOMES = os.path.join(BASE, "Outcomes-a.txt")
 
-FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-               'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+from ml.dataset import SERVING_FEATURES
+
+FEATURES_12 = SERVING_FEATURES
 
 EPOCHS = 50
 PATIENCE = 18

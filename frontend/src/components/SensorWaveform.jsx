@@ -16,15 +16,18 @@ export default function SensorWaveform() {
 
   const rows = useMemo(
     () =>
-      patientQueue.map((patient) => ({
-        patient,
-        series: {
-          HR: patient.waveform.map((p, i) => p + Math.sin(i / 2) * 5),
-          SpO2: patient.waveform.map((p, i) => 88 + (p - 50) * 0.18 - Math.cos(i / 3) * 1.1),
-          Resp: patient.waveform.map((p, i) => 14 + (p - 50) * 0.1 + Math.sin(i / 4) * 0.8),
-          Temp: patient.waveform.map((p, i) => 36.2 + (p - 50) * 0.03 + Math.cos(i / 5) * 0.03),
-        },
-      })),
+      patientQueue.map((patient) => {
+        const wave = Array.isArray(patient.waveform) ? patient.waveform : []
+        return {
+          patient,
+          series: {
+            HR: wave.map((p, i) => p + Math.sin(i / 2) * 5),
+            SpO2: wave.map((p, i) => 88 + (p - 50) * 0.18 - Math.cos(i / 3) * 1.1),
+            Resp: wave.map((p, i) => 14 + (p - 50) * 0.1 + Math.sin(i / 4) * 0.8),
+            Temp: wave.map((p, i) => 36.2 + (p - 50) * 0.03 + Math.cos(i / 5) * 0.03),
+          },
+        }
+      }),
     [patientQueue]
   )
   const channels = ORDER.filter((k) => shown[k])

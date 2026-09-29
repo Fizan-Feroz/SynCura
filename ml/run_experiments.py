@@ -14,14 +14,16 @@ import torch
 from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import GroupShuffleSplit
 
-BASE_DIR = r"C:\Users\fizan\Downloads\Techfusion\predicting-mortality-of-icu-patients-the-physionetcomputing-in-cardiology-challenge-2012-1.0.0\predicting-mortality-of-icu-patients-the-physionet-computing-in-cardiology-challenge-2012-1.0.0"
+from ml.dataset import SERVING_FEATURES
+from ml.paths import physionet2012_root as _pn_root
+
+BASE_DIR = _pn_root()
 PHYSIONET_DIR = os.path.join(BASE_DIR, "set-a_full", "set-a")
 OUTCOMES_FILE = os.path.join(BASE_DIR, "Outcomes-a.txt")
 HOLDOUT_DIR = os.path.join(BASE_DIR, "set-b_full", "set-b")
 HOLDOUT_OUTCOMES = os.path.join(BASE_DIR, "Outcomes-b.txt")
 VITAL_FEATURES_6 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2']
-VITAL_FEATURES_12 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
-                      'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose']
+VITAL_FEATURES_12 = SERVING_FEATURES
 VITAL_FEATURES_16 = ['HR', 'RespRate', 'Temp', 'NISysABP', 'NIDiasABP', 'SpO2',
                       'GCS', 'BUN', 'Creatinine', 'WBC', 'Platelets', 'Glucose',
                       'Lactate', 'pH', 'FiO2', 'MechVent']

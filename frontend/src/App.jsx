@@ -45,8 +45,9 @@ export default function App() {
   const [theme, setTheme] = useState(initialTheme)
   const toggleTheme = () => {
     const apply = () => setTheme((t) => (t === 'light' ? 'dark' : 'light'))
-    if (document.startViewTransition) document.startViewTransition(apply)
-    else apply()
+    if (document.startViewTransition && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      document.startViewTransition(apply)
+    } else apply()
   }
 
   useEffect(() => {
@@ -57,6 +58,17 @@ export default function App() {
       /* storage unavailable */
     }
   }, [theme])
+
+  // Stay in sync when another tab changes the theme.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === 'syncura-theme' && (e.newValue === 'dark' || e.newValue === 'light')) {
+        setTheme(e.newValue)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
 
   const shell = (children, props = {}) => (
     <AppShell theme={theme} onToggleTheme={toggleTheme} {...props}>{children}</AppShell>

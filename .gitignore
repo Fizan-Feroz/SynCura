@@ -51,6 +51,8 @@ ml/training_runs/**/*.log
 ml/training_runs/**/training.log
 ml/training_runs/**/stderr.log
 ml/training_runs/**/stdout.log
+# Per-run numpy outputs (predictions, labels) are large and regenerable.
+ml/training_runs/**/*.npy
 # Model weights: scratch checkpoints are ignored, but the deployed ensemble
 # (ml/models/ensemble/{s48,c93,s45}.pt, ~0.5 MB each) is tracked on purpose so
 # Render can boot without retraining. Matched by ml/deployed_manifest.json.

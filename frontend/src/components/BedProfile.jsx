@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { apiGet } from '../api'
-import { useSimulation } from '../simulationContext'
+import { mapLivePatient, useSimulation } from '../simulationContext'
 import AppShell from './AppShell'
 import { riskLabel, riskTone, seriesPath } from './trace'
 import { buildAlerts, calculateNews2, scoreContributions } from './alerts'
@@ -20,14 +20,27 @@ function fmtVital(value, digits = 0) {
 
 export default function BedProfile({ theme, onToggleTheme }) {
   const { patientId } = useParams()
-  const { patientQueue, backendOnline, source, liveMeta } = useSimulation()
-  const bed = patientQueue.find((p) => p.patient_id === patientId)
+  const { patientQueue, backendOnline, source, liveMeta, setDataSource } = useSimulation()
+  const queued = patientQueue.find((p) => p.patient_id === patientId)
   const [shap, setShap] = useState(null)
+  const [remoteBed, setRemoteBed] = useState(null)
 
   useEffect(() => {
     let cancelled = false
     setShap(null)
-    if (!backendOnline || !bed) return undefined
+    setRemoteBed(null)
+    if (!backendOnline) return undefined
+    if (!bed) {
+      // Cross-source deep link: fall back to the backend record directly.
+      apiGet(`/patient/${encodeURIComponent(patientId)}`)
+        .then((detail) => {
+          if (!cancelled && detail && detail.patient_id) setRemoteBed(mapLivePatient(detail))
+        })
+        .catch(() => {})
+      return () => {
+        cancelled = true
+      }
+    }
     apiGet(`/patient/${encodeURIComponent(bed.patient_id)}/explain`)
       .then((body) => {
         if (cancelled) return
@@ -51,6 +64,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
     </AppShell>
   )
 
+  const bed = queued || remoteBed
   if (!bed) {
     return shell(
       <div className="page">
@@ -60,9 +74,21 @@ export default function BedProfile({ theme, onToggleTheme }) {
         <h1>Bed not found</h1>
         <p className="muted">
           No bed with id <span className="num">{patientId}</span> in the current{' '}
-          {source === 'live' ? 'backend live' : 'replay'} view. It may live in the other data
-          source — switch source on the dashboard.
+          {source === 'live' ? 'backend live' : source === 'demo' ? 'demo' : 'replay'} view,
+          and the backend has no record for it either.
         </p>
+        <div className="page-actions">
+          {source !== 'live' && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setDataSource('live')}>
+              Try Backend live
+            </button>
+          )}
+          {source !== 'replay' && (
+            <button type="button" className="btn btn-quiet btn-sm" onClick={() => setDataSource('replay')}>
+              Try Replay
+            </button>
+          )}
+        </div>
       </div>
     )
   }

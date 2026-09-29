@@ -4,13 +4,41 @@ from pathlib import Path
 
 DB_PATH = str(Path(__file__).parent / "data" / "vitals.db")
 
+# Generous busy timeout: concurrent uvicorn threads plus replay/MQTT writers
+# share one SQLite file; waiting beats "database is locked" 500s.
+BUSY_TIMEOUT_SECONDS = 30
+
+# Row cap: the vitals table grows on every ingest with no natural expiry.
+# Purge keeps the newest rows (by autoincrement id, era-agnostic: replay rows
+# use seconds-since-admission timestamps, live rows use wall-clock).
+MAX_VITALS_ROWS = 200000
+
+
+def _connect():
+    return sqlite3.connect(DB_PATH, timeout=BUSY_TIMEOUT_SECONDS)
+
+
+def purge_old_vitals(max_rows=MAX_VITALS_ROWS):
+    """Delete oldest vitals beyond max_rows. Returns rows deleted."""
+    conn = _connect()
+    with closing(conn):
+        cur = conn.cursor()
+        cur.execute(
+            "DELETE FROM vitals WHERE id NOT IN "
+            "(SELECT id FROM vitals ORDER BY id DESC LIMIT ?)",
+            (max_rows,),
+        )
+        deleted = cur.rowcount
+        conn.commit()
+        return deleted
+
 
 LAB_COLUMNS = ["gcs", "bun", "creatinine", "wbc", "platelets", "glucose"]
 
 
 def init_db():
     Path(DB_PATH).parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     with closing(conn):
         cur = conn.cursor()
         cur.execute('''
@@ -50,7 +78,7 @@ def _get(record, *keys):
 
 
 def insert_vital(record):
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     with closing(conn):
         cur = conn.cursor()
         cur.execute(
@@ -80,7 +108,7 @@ def insert_vital(record):
 
 def get_latest_vitals(patient_id, limit=10):
     """Get the latest vital readings for a patient."""
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     with closing(conn):
         cur = conn.cursor()
         cur.execute(
@@ -98,7 +126,7 @@ def get_top_patients(limit=6):
     Ties on timestamp (e.g. a device sending a constant timestamp) resolve to
     the most recently inserted row instead of returning the patient twice.
     """
-    conn = sqlite3.connect(DB_PATH)
+    conn = _connect()
     with closing(conn):
         cur = conn.cursor()
         cur.execute("""

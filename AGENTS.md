@@ -81,6 +81,8 @@ PROJ/
 ├── backend/                     # FastAPI REST API
 │   ├── app.py                   # Main API: /health, /ingest, /patients, /scores, /metrics, /explain
 │   ├── inference.py             # RiskScoreEngine: loads AttentionLSTM, real-time scoring
+│   ├── simulation.py            # Shared scenario engine (seeded ticks, model scoring, /simulation/*)
+│   ├── dashboard.py             # Self-contained HTML status page served at /
 │   ├── training.py              # TrainingManager: background training jobs
 │   ├── db.py                    # SQLite database (vitals storage)
 │   ├── replay.py                # PhysioNet data replay (HTTP/MQTT ingest)
@@ -246,9 +248,9 @@ npm run build     # catches broken imports and CSS ordering
 
 ## Known Issues
 
-- Frontend simulation is client-side only (does not read back from backend), and dynamic simulation views are gated on a successful `/health` check
-- The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; older sweep scripts may retain historical local copies. `backend/tests/test_audit_fixes.py` checks the shared contract and saved-artifact order.
-- No unit tests exist yet
+- Frontend beds come from the backend-selected source (`Backend live`, `Replay`, or local-only `Demo`); dynamic backend views are gated on a successful `/health` check
+- The canonical 12-feature order is `SERVING_FEATURES` in `ml/dataset.py`; every script imports it — never retype the list. `backend/tests/test_audit_fixes.py` checks the shared contract and saved-artifact order.
+- Test suite: `backend/tests/` — run `python -m pytest backend/tests/ -q` from the repo root (CI runs it plus the frontend build)
 - `chart.js` and `socket.io-client` were removed from `frontend/package.json` in the redesign; do not reintroduce them, the UI draws SVG traces directly
 - `ml/models/*.pt` is gitignored, so scratch checkpoints need `git add -f`. The deployed
   ensemble `ml/models/ensemble/{s48,c93,s45}.pt` is tracked on purpose (Render boots from it,

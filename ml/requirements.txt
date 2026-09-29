@@ -1,12 +1,12 @@
 numpy==2.2.6
 pandas==2.3.3
 scikit-learn==1.7.2
-scipy==1.15.3
 # NOTE: CPU wheel from PyPI. For CUDA 12.1 (as in the dev .venv):
 # pip install torch==2.5.1+cu121 --index-url https://download.pytorch.org/whl/cu121
 torch==2.5.1
 shap==0.49.1
 matplotlib==3.10.9
-seaborn==0.13.2
 tqdm==4.67.3
 pytest==9.1.1
+# Data-fetch tooling (scripts/download_data.py, team Drive downloads).
+gdown==5.2.0

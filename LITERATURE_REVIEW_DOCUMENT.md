@@ -1,4 +1,7 @@
 # SynCura - Literature Review Document
+
+> **Superseded.** Prefer `LITERATURE_REVIEW.md`, which is the maintained survey
+> (findings table + DOIs). This document is kept for history.
 ### Predictive ICU Monitoring System Using Attention-Based LSTM with Real-Time Explainability
 **P.A. College of Engineering | Department of Computer Science & Engineering**
 **Team: Abdul Ahad Ikkeri (4PA24CS002), Fathima Reeha (4PA24CS026), Fizan Feroz (4PA24CS032)**
