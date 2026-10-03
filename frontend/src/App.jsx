@@ -15,6 +15,7 @@ const ArchitecturePage = lazy(() => import('./components/ArchitecturePage'))
 const BedProfile = lazy(() => import('./components/BedProfile'))
 const SensorWaveform = lazy(() => import('./components/SensorWaveform'))
 const AdminPanel = lazy(() => import('./components/AdminPanel'))
+const VersionPage = lazy(() => import('./components/VersionPage'))
 
 function initialTheme() {
   try {
@@ -103,6 +104,7 @@ export default function App() {
             )}
             <Route path="/architecture" element={shell(<ArchitecturePage />)} />
             <Route path="/admin" element={shell(<AdminPanel />, { wide: true })} />
+            <Route path="/version" element={shell(<VersionPage />)} />
           </Routes>
         </Suspense>
         <Analytics />
