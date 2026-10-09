@@ -1,16 +1,17 @@
-# SynCura — Talking Points (glance sheet)
+# SynCura — Talking Points (glance sheet, SYNOPSIS deck)
 
-**When:** 18 Sept, 2–4pm (A Section, slot 1) | **Team:** Fizan Feroz (4PA24CS032), Abdul Ahad Ikkeri (4PA24CS002), Fathima Reeha (4PA24CS026)
+**Deck:** `ppt/PROJECT SYNOPSIS PPT-FORMAT_TRIMMED_V3.pptx` (10 slides) | **Team:** Abdul Ahad Ikkeri (4PA24CS002), Fathima Reeha (4PA24CS026), Fizan Feroz (4PA24CS032) | **Guide:** Divya K
+**Format:** white background, Times New Roman, justified, 1.5 spacing | **Motion:** fade transition every slide; bullets build on click; table/refs fade on click; title + Thank-You auto-fade
 **Rubric (25):** Problem 4, Base-paper 4, Novelty 4, Feasibility 4, PPT 3, Participation 3, Questions 3
 
 ## One-liner pitch
-Attention-LSTM that reads 12 vitals/labs over 90 minutes and gives a real-time 0–100 deterioration risk **with explanations** — the papers stop at AUC, we ship the path.
+Attention-LSTM that reads 12 vitals/labs over 90 minutes and gives a real-time 0–100 mortality risk **with explanations** — the papers stop at AUC, we ship the path.
 
 ## Our numbers (memorize)
 - **0.834** fresh 20% set-B holdout AUC (95% CI 0.825–0.843, window-level bootstrap) vs **0.840** validation → consistent, not overfit
 - Honest caveat: the holdout was unseen by weights but USED during ensemble selection — it is not a locked final test set
 - 2-layer LSTM, hidden 96, additive temporal attention, 12 features, 90-min window, stride 15
-- Ensemble of 3 LSTM models, logit-averaged
+- Ensemble of 3 LSTM models (e12+e13+c53), logit-averaged; operating point 0.70 → precision ~0.50 at recall ~0.48
 
 ## Training patients (memorize)
 - **Total:** 8,000 (set-a 4,000 + set-b 4,000)
@@ -24,35 +25,38 @@ Vitals: HR 60–100 (pump stress) · RespRate 12–20 (breathing trouble) · Tem
 Labs+neuro: GCS 3–15 (consciousness) · BUN 6–24 (kidney waste) · Creatinine 0.6–1.2 (kidney marker) · WBC 4.5–11k (infection fight) · Platelets 150–450k (clotting/sepsis) · Glucose 70–140 (stress swings)
 Line: six fast signals catch the crash, six slow ones explain the cause.
 
-## Slide → line (15 slides)
-1. Title: SynCura — Predictive ICU Monitoring System (Attention-LSTM + real-time explainability)
-2. Problem: NEWS2/SOFA are threshold rules; they miss trends/direction/rate of change
-3. Motivation: deterioration is a process; early + explainable = more review time
-4. Existing work: BASE Zheng 2025 on top, 7 supporting below
-5. Base paper: Zheng 2025 TBAL — 0.936/0.919, hourly, 176K stays; RETROSPECTIVE till-discharge (peaks 0.989 = hindsight); we mirror architecture, restrict to 90-min only + add SHAP
-6. Proposed: rolling 90-min window → risk → temporal-attention + SHAP explanation → dashboard → misses/false alarms queue into weighted retraining + SHAP bar chart
-7. Methodology: 5-box flow (DATA → PREPARE → WINDOW → MODEL → SERVE) + leakage-controls caption
-8. Expected outcome: live dashboard, 0–100 score, explanations, NEWS2 comparison, quantified lead time
-9. Result: 0.840 / **0.834** (95% CI 0.825–0.843) + ROC curve + metrics table (val vs holdout)
-10. Limitations & improvement path: paper 0.936/0.989 hindsight → 0.81/0.76 cross-hospital; stricter-by-design SynCura; scouted upgrades
-11. Tech: PyTorch, FastAPI, React/Vite/Tailwind, SQLite, SHAP + SENSE→INGEST→SCORE→ACT strip
-12. SDG 3 (health) + SDG 9 (innovation)
-13. Conclusion: end-to-end explainable prototype; needs external validation, not clinical-ready
-14. References [1]–[9]: Zheng FIRST as base, full titles, then 7 supporting + PhysioNet
-15. Thank You
+## Slide → line (10 slides, ~7 minutes)
+1. **Title (20s):** "Good morning/afternoon. We are presenting SynCura — Predictive ICU Monitoring System Using Attention-Based LSTM — real-time mortality risk with SHAP plus temporal-attention explainability. Under the guidance of Divya K. Team: Abdul Ahad Ikkeri, Fathima Reeha, Fizan Feroz." (Title + team auto-fade on load — no clicks needed.)
+2. **Abstract (40s, 5 clicks):** deterioration kills, NEWS2 misses trends → attention-LSTM on 12 features × 90-min windows, FastAPI + React → trained on PhysioNet 2012 (4,000 stays) → ensemble 0.840 val / **0.834** holdout → real-time score with explanations; prototype, not a medical device.
+3. **Introduction (40s, 5 clicks):** ICU mortality 10–29%, early detection saves lives → NEWS2/SOFA/APACHE-II are static, manual, single-timepoint → they miss direction, duration, interaction → Objective 1–2: model + full-stack system → Objective 3–5: explainability, NEWS2 comparison, simulation.
+4. **Literature Survey (60–90s, 1 click):** "Ten studies in one table — title, authors, year, features, limitations. Row 1 is our base: Zheng 2025, time-aware attention-LSTM, dynamic AUROC 0.936 — but retrospective, inflates near discharge, drops cross-hospital. The pattern down the Limitations column is our justification: retrospective data, weak explanations, no deployment." Do NOT read all 10 rows. Name-check DEWS (Choi 2020, beats NEWS2) and RealMIP (missing-data recovery = our scouted upgrade).
+5. **Problem Statement (30s, 2 clicks):** bedsides scores depend on single-timepoint thresholds → need an automated model that learns temporal patterns from streaming vitals/labs AND shows its reasons.
+6. **Methodology (60s, 6 clicks):** PhysioNet 2012, 4,000 stays, 37 variables → 12 features (6 vitals + 6 labs/neuro) → 90-min windows, causal interpolation, train-only z-score, patient-level split → 2-layer LSTM-96 + additive attention, weighted BCE, Adam, early stopping, 3-model ensemble → pipeline: vitals → /ingest → SQLite → scorer (0–100) → dashboard + Discord/Telegram alerts.
+7. **Work Done (60s, 6 clicks — the money slide):** ensemble deployed (e12+e13+c53) → **0.840 / 0.834** (CI 0.825–0.843), locked slices 0.828/0.818 → threshold 0.70 gives precision ~0.50 at recall ~0.48 → backend live (/ingest, /patients, /explain) → dashboard live (risk board, 5 scenarios, NEWS2 comparison) → explainability verified: SpO2, RespRate, SysBP top drivers; no future leakage.
+8. **Future Roadmap (40s, 6 clicks):** prospective validation + calibration (prototype only) → MIMIC-IV/eICU migration with fairness analysis → Temporal Fusion Transformer → BioBERT notes fusion → federated + TinyML edge → mistake-driven retraining loop with holdout gating.
+9. **References (15s, 1 click):** "Ten IEEE references — Zheng 2025 FIRST as our base paper, then the supporting studies and the PhysioNet 2012 dataset." Do not read them aloud.
+10. **Thank You (auto-fade):** "Thank you. SynCura is an explainable research prototype for early ICU risk monitoring. We welcome your questions."
 
-## Papers with FULL names (remember these)
+## Click discipline (animations)
+- Bullets build on click — one idea per click, pause half a beat so the examiner reads it.
+- Slide 4 table and slide 9 references fade as ONE block — single click each, do not expect stepwise builds there.
+- Never rapid-fire clicks: each click must match the sentence you are saying.
+
+## Papers in THIS deck (remember these)
 | Ref | Full title | Key number |
 |---|---|---|
 | **[1] Base — Zheng et al. 2025** | Development and Validation of a Dynamic Real-Time Risk Prediction Model for ICU Patients Based on Longitudinal Irregular Data: Multicenter Retrospective Study (JMIR 27, e69293) | AUROC 0.936 MIMIC-IV / 0.919 eICU |
-| [2] Wang, Bai & Jin 2026 | Explainable Deep-Learning Models for Predicting ICU Patient Outcome (Frontiers in Physiology 17) | AUC 0.79–0.87 |
-| [3] Yan et al. 2026 | Deep Learning-Based In-Hospital Mortality Prediction Using Long-Term Sequential Data in ICU Patients (PeerJ 14, e21631) | plain LSTM AUC 0.802 |
-| [4] Sadanandan 2026 | Multimodal Deep Learning for Early Prediction of Patient Deterioration in the ICU: Integrating Time-Series EHR Data with Clinical Notes (arXiv:2603.14719) | AUROC 0.7857 |
-| [5] Wu et al. 2024 | Revisiting the Potential Value of Vital Signs in the Real-Time Prediction of Mortality Risk in ICU Patients (Journal of Big Data 11, 40) | LSTM AUC 0.9263 |
-| [6] Xie et al. 2025 (RealMIP) | Unlocking the Potential of Real-Time ICU Mortality Prediction: Redefining Risk Assessment with Continuous Data Recovery (npj Digital Medicine 8, 733) | AUC 0.957–0.968 |
-| [7] Choi et al. 2020 | Deep Interpretable Early Warning System for the Detection of Clinical Deterioration (IEEE JBHI 24(9)) | AUROC ~0.880 > NEWS2 |
-| [8] Scheid et al. 2025 | Development and Validation of a Clinical Wearable Deep Learning Based Continuous In-Hospital Deterioration Prediction Model (Nature Communications 16, 9513) | AUROC ~0.89, long lead time |
+| [2] Alshwaheen et al. 2021 | A Novel and Reliable Framework of Patient Deterioration Prediction in ICU Based on LSTM-RNN (IEEE Access 9) | AUROC 0.933 |
+| [3] Choi et al. 2020 | Deep Interpretable Early Warning System for the Detection of Clinical Deterioration (IEEE JBHI 24(9)) | AUROC ~0.880 > NEWS2 |
+| [4] Li et al. 2025 | Attention Residual LSTM-FCN / Inpatient Length of Stay and Mortality Prediction (IEEE Access 13) | attention adds ~0.073 AUC |
+| [5] PULSE-ICU 2025 | A Pretrained Unified Long-Sequence Encoder for Multi-task Prediction in ICUs (arXiv:2511.22199) | mortality AUROC 0.887 |
+| [6] GARLIC 2026 | Graph Attention-based Relational Learning of Multivariate Time Series in Intensive Care (arXiv:2608.10969) | SOTA AUROC |
+| [7] Yan et al. 2026 | Deep Learning-Based In-Hospital Mortality Prediction Using Long-Term Sequential Data in ICU Patients (PeerJ 14, e21631) | AUROC 0.95 internal |
+| [8] Scheid et al. 2025 | Development and Validation of a Clinical Wearable Deep Learning Based Continuous In-Hospital Deterioration Prediction Model (Nature Communications 16, 9513) | AUROC ~0.89, 17h lead |
 | [9] PhysioNet 2012 | Computing in Cardiology Challenge 2012 dataset | physionet.org/content/challenge-2012/ |
+| [10] Wang et al. 2026 | Expert Augmented Prediction of Circulatory and Respiratory Instability (npj Digital Medicine) | AUROC > 0.8, transparent rules |
+
+Note: the slide-4 survey table and slide-9 references are DIFFERENT sets on purpose — the table surveys the field (10 rows incl. RealMIP, Sadanandan, Wu, Nguyen, Do), the references cite what we built on. If asked: "the table is the landscape, the references are our foundations."
 
 Dataset: PhysioNet / Computing in Cardiology Challenge 2012 — https://physionet.org/content/challenge-2012/
 
@@ -78,7 +82,7 @@ Dataset: PhysioNet / Computing in Cardiology Challenge 2012 — https://physione
 - **No unit tests** — prevents safe CI-style regressions.
 - **Clean-data gap** — model trained on curated retrospective data; real sensor noise (MASC/Scheid point) untested.
 
-If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrades — eICU/MIMIC validation, missing-data recovery, prospective pilot.
+If asked "so what's missing?": name 2–3 and always tie back to Slide 8 roadmap — eICU/MIMIC validation, missing-data recovery, prospective pilot.
 
 ## Pitfalls
 - Don't say "clinical ready" — always "explainable research prototype".
@@ -122,17 +126,18 @@ If asked "so what's missing?": name 2–3 and always tie back to Slide 10 upgrad
 - **Q: Ethics / privacy?** A: Deidentified public data, no PHI; deployment needs consent, privacy, bias audit (worse ≥65 subgroup), regulatory clearance.
 
 ### 5. PPT (3 marks)
-- **Q: Why base vs supporting split on slide 4?** A: Base = adapted architecture+task (Zheng 2025); supporting = targets, bounds, methods, contrast.
-- **Q: References slide?** A: Zheng as [1] with full title, 8 supporting papers with full citations, PhysioNet dataset. No ellipsis, no truncation.
+- **Q: Why a table on the literature slide?** A: Synopsis format demands ≥10 papers at a glance — one table with title/author/year/features/limitations; the Limitations column itself makes our case.
+- **Q: Why do table and references differ?** A: Table = field landscape (10 rows); references = our foundations (base + supporting + dataset). Deliberate split.
+- **Q: References slide?** A: Zheng as [1] with full title, 8 supporting papers with full citations, PhysioNet dataset as [9]. No ellipsis, no truncation.
 - **Q: Report says 0.837/0.807 but slides say 0.840/0.834?** A: Synced — report, README, and AGENTS now describe the deployed 3-model ensemble (val 0.840, fresh holdout 0.834); 0.837/0.807 kept as previous-milestone row.
 
 ### 6. PARTICIPATION (3 marks)
 - **Q: Who did what?** A: Fizan Feroz — ML pipeline + backend; teammates — frontend + integration. Each member owns: one can demo dashboard scenarios, one can explain attention/SHAP output, one can defend metrics/holdout.
-- **Q: Equal contribution?** A: Show commits across ml/, backend/, frontend/; rehearse handoffs per slide.
+- **Q: Equal contribution?** A: Show commits across ml/, backend/, frontend/; rehearse handoffs per slide (1–3 member A, 4–6 member B, 7–10 member C).
 
 ### 7. QUESTIONS / DEFENSE (3 marks)
 - **Q: Is 0.834 clinically enough?** A: Strong prototype, not deployment bar. Field range for vitals-only is 0.70–0.85; Wu upper bound 0.926. Needs calibration + prospective validation.
 - **Q: Why PhysioNet 2012, not MIMIC-IV?** A: Public, reproducible, established benchmark; age acknowledged; eICU/MIMIC validation needs credentialed access (out of current 2012+2019 scope).
 - **Q: Lead time — how measured?** A: Average early-warning hours vs NEWS2>=7 crossing on dashboard analytics; must be measured properly, not assumed.
-- **Q: Biggest limitation in one line?** A: Single retrospective dataset, no cross-hospital or prospective evidence — every limit has a named upgrade on slide 10.
+- **Q: Biggest limitation in one line?** A: Single retrospective dataset, no cross-hospital or prospective evidence — every limit has a named upgrade on slide 8.
 - **Q: Six more months?** A: Credentialed eICU/MIMIC access for external validation, RealMIP imputation, time-aware attention, prospective pilot with decision curves.
