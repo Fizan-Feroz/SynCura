@@ -58,6 +58,26 @@ Line: six fast signals catch the crash, six slow ones explain the cause.
 
 Note: the slide-4 survey table and slide-9 references are DIFFERENT sets on purpose — the table surveys the field (10 rows incl. RealMIP, Sadanandan, Wu, Nguyen, Do), the references cite what we built on. If asked: "the table is the landscape, the references are our foundations."
 
+## Supporting papers — 2 lines each (say verbatim if asked)
+- **Yan et al. 2026 (PeerJ):** compared LSTM/GRU/RNN/Transformer/Informer + stacking on multi-center ICU data — plain LSTM won (AUC 0.802). → "That is why our backbone is an LSTM, not a Transformer."
+- **Sadanandan 2026 (arXiv):** BiLSTM + ClinicalBERT notes fusion, AUROC 0.786; its 31-study review finds vitals-only systems land at 0.70–0.85. → "Our 0.834 sits at the top of the field's expected band — and it justifies our BioBERT roadmap item."
+- **Wu et al. 2024 (J Big Data):** same core vitals as ours, real-time short-window, LSTM AUC 0.926 on 33k MIMIC-III patients. → "Closest input match and our honest upper bound — they had 8× our data with full MIMIC variables."
+- **Nguyen et al. 2017:** the original attention-LSTM on PhysioNet 2012 mortality — our architecture's ancestor, same dataset and task. → "Lineage: we did not invent attention-LSTM, we productized it."
+- **Xie et al. 2025 RealMIP (npj Digit Med):** generative real-time imputation, AUC 0.957–0.968 across eICU/MIMIC/SICdb. → "The gold standard for missing data — which is exactly why it is our scouted upgrade, not our claim: that ceiling needs multi-database training we don't have."
+- **Choi et al. 2020 DEWS (IEEE JBHI):** BiLSTM + attention early-warning, AUROC 0.880, beats NEWS2. → "Proof attention models beat NEWS2 — our dashboard replays that comparison live."
+- **Li et al. 2025 ARLF (IEEE Access):** attention residual LSTM-FCN; attention alone added +0.073 AUC. → "Quantified proof the attention is doing work, not decoration."
+- **Do et al. 2023 (IEEE Access) + GARLIC 2026:** graph attention over variables instead of temporal attention over time. → "Deliberate contrast: graphs model variable relationships, we model time — streaming simplicity won for a real-time prototype; graphs are a future arm."
+- **Scheid et al. 2025 (Nature Commun):** wearable continuous vitals, AUROC 0.89 with 17-hour lead. → "Validates long lead times from continuous vitals — and motivates our ESP32 extension."
+- **Alshwaheen et al. 2021 (IEEE Access):** LSTM-RNN + genetic optimization, AUROC 0.933 on MIMIC-III. → "Tuned LSTMs compete at the top on big data — our gap is data scale, not architecture."
+- **PULSE-ICU 2025 (arXiv):** Longformer foundation model, mortality AUROC 0.887. → "Foundation models win with scale; our LSTM wins on CPU-cost streaming — the right trade for a bedside prototype."
+- **Wang et al. 2026 EAEWS (npj Digit Med):** expert rules + ML, AUROC >0.8 with transparency. → "Independent proof clinicians accept hybrid rule+ML systems — our threshold slider and NEWS2 comparison follow the same trust logic."
+
+Likely supporting-paper follow-ups:
+- **"Wu reports 0.926, you report 0.834?"** A: Different data and scale (MIMIC-III 33k vs PhysioNet 4k), and ours is causal 90-min-only with an honest holdout — theirs is the upper bound, not the target.
+- **"RealMIP hits 0.96 — why not copy it?"** A: Needs 188-center training plus generative imputation; a single-dataset vitals-only system cannot claim that ceiling — it is our roadmap, not our result.
+- **"Why not graph attention or Transformers?"** A: Streaming + CPU simplicity; Yan 2026 shows plain LSTM beats Transformer here, and graphs model variables while we need time.
+- **"A foundation model beats you?"** A: Scale-vs-deployability trade — ours scores per-ingest on CPU with per-patient explanations.
+
 Dataset: PhysioNet / Computing in Cardiology Challenge 2012 — https://physionet.org/content/challenge-2012/
 
 ## Ammo for Q&A (do-not-fumble lines)
