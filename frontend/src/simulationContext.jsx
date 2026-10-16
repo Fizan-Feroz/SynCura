@@ -83,6 +83,17 @@ const DEMO_LAB_ANCHORS = { GCS: 15, BUN: 18.0, Creatinine: 1.0, WBC: 8.0, Platel
 const DEMO_LAB_NOISE = { GCS: 0, BUN: 0.4, Creatinine: 0.03, WBC: 0.15, Platelets: 4.0, Glucose: 1.5 }
 const DEMO_LAB_BOUNDS = { GCS: [3, 15], BUN: [5, 80], Creatinine: [0.4, 6.0], WBC: [1.0, 30.0], Platelets: [20.0, 600.0], Glucose: [60.0, 300.0] }
 
+// Mirrors backend/simulation.py: ramped per-tick scenario nudge, capped so
+// beds differentiate instead of pinning at the rails. Per-tick values match
+// the backend; the demo ramp runs slightly taller (26 over 13 ticks vs 20
+// over 10) because the demo heuristic scores deteriorated vitals lower than
+// the real model does, so backend-identical values peak at ~81, just under
+// Critical. Without any nudge the demo equilibrates near ~60 and no scenario
+// ever reaches Critical.
+const DEMO_NUDGE_PER_TICK = { baseline: 0.0, respiratory: 1.5, septic: 2.0, cardiac: 2.0, recovery: -2.0 }
+const DEMO_NUDGE_CAP = 26
+const DEMO_NUDGE_RAMP_TICKS = 13
+
 function seedDemoBeds(patients) {
   return (Array.isArray(patients) ? patients : []).map((patient) => {
     const trajectory = assignTrajectory()
@@ -98,6 +109,7 @@ function seedDemoBeds(patients) {
     return {
       ...patient,
       risk,
+      riskBase: risk,
       trend: '+0',
       lead: profile.lead,
       trajectory,
@@ -118,7 +130,7 @@ function scoreContributionsDemo(vitals) {
   )
 }
 
-function updateDemoBed(patient, scenarioProfile, scenarioLead, gain = 1.0) {
+function updateDemoBed(patient, scenarioProfile, scenarioLead, gain = 1.0, nudge = 0) {
   const trajectory = patient.trajectory || 'stable'
   const traj = trajectoryProfile(trajectory)
   const randomizer = Math.max(0.8, (scenarioProfile.volatility + traj.volatility) / 2)
@@ -146,10 +158,17 @@ function updateDemoBed(patient, scenarioProfile, scenarioLead, gain = 1.0) {
   // Mirrors backend/simulation.py: pull toward the vitals-implied level so
   // open-loop drift cannot march every bed to the 99 clamp.
   const implied = clamp(30 + scoreContributionsDemo(nextVitals) * 0.35, 8, 99)
-  const nextRisk = Math.round(clamp(
-    patient.risk + (implied - patient.risk) * 0.3 + combined.riskDrift * 0.05 + randomCentered(randomizer * 0.5),
+  // Base dynamics never see the display nudge: storing nudged risk would
+  // feed back into the pull term and pin every bed at 99 within a minute.
+  const baseSeed = Number.isFinite(patient.riskBase) ? patient.riskBase : patient.risk
+  const baseRisk = Math.round(clamp(
+    baseSeed + (implied - baseSeed) * 0.3 + combined.riskDrift * 0.05 + randomCentered(randomizer * 0.5),
     8, 99
   ))
+  // Mirrors backend/simulation.py `_score_pending`: the scenario nudge is
+  // added to the displayed risk AFTER the heuristic, ramped and capped, so
+  // severe scenarios can reach Critical without pinning every bed at 99.
+  const nextRisk = Math.round(clamp(baseRisk + nudge, 8, 99))
   const riskChange = nextRisk - patient.risk
   let leadLabel = scenarioLead
   if (nextRisk >= 85) leadLabel = 'Multi-organ deterioration'
@@ -158,6 +177,7 @@ function updateDemoBed(patient, scenarioProfile, scenarioLead, gain = 1.0) {
   return {
     ...patient,
     risk: nextRisk,
+    riskBase: baseRisk,
     trend: `${riskChange >= 0 ? '+' : ''}${riskChange}`,
     status: statusForRisk(nextRisk),
     lead: leadLabel,
@@ -398,6 +418,12 @@ export function SimulationProvider({ children }) {
 
   // Demo mode: local-only tick. Never touches the backend, never syncs —
   // for demos when shared state must stay untouched (or backend is down).
+  // Ticks since the scenario was set drive the ramped display nudge.
+  const demoTickRef = React.useRef(0)
+  useEffect(() => {
+    demoTickRef.current = 0
+  }, [source, demoScenario])
+
   useEffect(() => {
     if (source !== 'demo' || demoPaused) return undefined
     let cancelled = false
@@ -405,7 +431,12 @@ export function SimulationProvider({ children }) {
       if (document.visibilityState === 'hidden' || cancelled) return
       const { profile, lead } = SCENARIOS[demoScenario]
       const gain = demoScenario === 'baseline' ? 1.0 : DEMO_DRIFT_GAIN
-      setPatientQueue((current) => current.map((patient) => updateDemoBed(patient, profile, lead, gain)))
+      demoTickRef.current += 1
+      const rampNudge = clamp(
+        (DEMO_NUDGE_PER_TICK[demoScenario] ?? 0) * Math.min(demoTickRef.current, DEMO_NUDGE_RAMP_TICKS),
+        -DEMO_NUDGE_CAP, DEMO_NUDGE_CAP
+      )
+      setPatientQueue((current) => current.map((patient) => updateDemoBed(patient, profile, lead, gain, rampNudge)))
       setLastUpdated(new Date())
     }, 1000)
     return () => {
