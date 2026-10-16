@@ -28,6 +28,7 @@ data/
 ├── mimic-iii-clinical-database-demo-1.4.zip
 ├── mimic-iv-clinical-database-demo-2.2.zip
 └── mimic-iv-ed-demo-2.2.zip                         # ED only — not used
+└── sicdb-1.0.8/                                     # PENDING access approval (see §3)
 ```
 
 ## Dataset cards
@@ -42,6 +43,13 @@ data/
 - 20,336 ICU stays, hourly rows, pipe-delimited `.psv`, per-hour `SepsisLabel` (~9% positive).
 - Maps to 11/12 features (HR, O2Sat, Temp, SBP, DBP, Resp, BUN, Creatinine, Glucose, WBC, Platelets; **no GCS** — the 2019 schema has no GCS column).
 - Use: second training corpus / deterioration-label experiments. Loader: `ml/challenge2019_to_features.py`, reusing the canonical `SERVING_FEATURES` order and `ml/dataset.py` windowing. Its patient-level label collapses `SepsisLabel`, so it means sepsis onset rather than in-hospital death; do not pool it with PhysioNet labels. Policy: cleared for `train`, not for `deploy_train` in `ml/dataset_registry.py`.
+
+### 3. SICdb v1.0.8 (Salzburg) — PENDING access, not on disk yet
+- ~27,350 ICU admissions (2013–2021, 4 units, Salzburg), hourly + minute-level vitals/labs/meds, mortality via `cases.OffsetOfDeath` (capped 1 yr, incl. out-of-hospital deaths).
+- Format: 7 tables as `.csv.gz` (`cases`, `data_float_h`, `data_ref`, `data_range`, `d_references`, …); minute data is serialized IEEE-754 streams needing the sicdb unpacking script (github.com/nrodemund/sicdb).
+- Access (human-only): PhysioNet credentialing + CITI "Data or Specimens Only" + author request with research question + signed DUA. Then: `set PHYSIONET_USER/PHYSIONET_PASSWORD` and `python scripts/download_sicdb.py --list-only` (check GB size first — minute data is heavy).
+- Caveats: perioperative overrepresentation → LOW overall mortality (worse imbalance than 2012); implausible values present (real-world capture).
+- Governance: out of SCOPE until the team decides otherwise — needs a scope edit here + `ml/dataset_registry.py` clearance + 12-feature ETL before any training/eval use. Never re-upload (DUA).
 
 ## Disregarded datasets (out of scope — files may remain on disk, never use)
 
