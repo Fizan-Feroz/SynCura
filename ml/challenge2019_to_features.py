@@ -130,26 +130,29 @@ def _load_one_psv(path):
     return per_minute, label, patient_id
 
 
-def load_challenge2019_batch(setA_dir, max_patients=None):
-    """Load Challenge-2019 training_setA .psv files into ml.dataset-compatible tuples."""
+def load_challenge2019_batch(dir_path, max_patients=None):
+    """Load Challenge-2019 .psv files (from training_setA, training_setB, or list of dirs) into ml.dataset-compatible tuples."""
     require('challenge2019', 'train')  # raises with a clear reason if misused
 
-    files = sorted(glob.glob(os.path.join(setA_dir, '*.psv')))
+    if isinstance(dir_path, (list, tuple)):
+        files = []
+        for d in dir_path:
+            files.extend(sorted(glob.glob(os.path.join(d, '*.psv'))))
+    else:
+        files = sorted(glob.glob(os.path.join(dir_path, '*.psv')))
+
     if max_patients:
         files = files[:max_patients]
 
     data = []
     skipped = 0
-    for fp in files:
-        try:
-            result = _load_one_psv(fp)
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+        for result in executor.map(_load_one_psv, files):
             if result is None:
                 skipped += 1
-                continue
-            data.append(result)
-        except Exception as e:
-            print(f'Warning: failed to load {fp}: {e}')
-            skipped += 1
+            else:
+                data.append(result)
 
     if skipped:
         print(f'Warning: skipped {skipped} of {len(files)} Challenge-2019 files')

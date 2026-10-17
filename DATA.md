@@ -18,31 +18,38 @@ so they stay versioned with the code. This file is the inventory; that file is t
 data/
 ├── predicting-mortality-...-challenge-2012-1.0.0/   # TRAINING data (extracted)
 ├── predicting-mortality-...-challenge-2012-1.0.0.zip
-├── challenge-2019-1.0.0/training/training_setA/     # 20,336 PSV files
+├── challenge-2019-1.0.0/training/training_setA/     # 20,336 PSV files (Hospital A)
+├── challenge-2019-1.0.0/training/training_setB/     # 20,000 PSV files (Hospital B)
+├── vitaldb/                                         # VitalDB (cases.csv, labs.csv, trks.csv)
 ├── mimic-iv-demo-2.2/                               # extracted MIMIC-IV demo
 ├── eicu-crd-demo-2.0.1/                             # 31 .csv.gz tables
-├── hospital-deterioration-dataset/                  # simulated benchmark + docs
-├── kaggle-icu-mortality/                            # 15k-row tabular CSV
-├── kaggle-icu-risk-score/                           # 1k-row snapshot CSV
-├── kaggle-sepsis-mimic-style/                       # 5k-subject wide CSV
-├── mimic-iii-clinical-database-demo-1.4.zip
-├── mimic-iv-clinical-database-demo-2.2.zip
-└── mimic-iv-ed-demo-2.2.zip                         # ED only — not used
-└── sicdb-1.0.8/                                     # PENDING access approval (see §3)
 ```
 
 ## Dataset cards
 
-### 1. PhysioNet 2012 Challenge — THE training data (real)
-- 8,000 ICU stays (set-a 4,000 train/val + set-b 4,000 holdout), 48 h each.
+### 1. PhysioNet 2012 Challenge — THE training & benchmark data (real)
+- 12,000 ICU stays total:
+  - `set-a`: 4,000 train/val stays
+  - `set-b`: 4,000 holdout stays
+  - `set-c`: 4,000 additional independent stays (Outcomes-c.txt: 585 deaths / 3,415 survived)
 - Format: one `.txt` per patient, long `Time,Parameter,Value` rows + `Outcomes-*.txt` (`In-hospital_death`).
-- Covers all 12 SynCura features (SpO2 read as SaO2).
-- Loader: `ml/dataset.py` (90-min windows, stride 15, proximity labels). Proximity means only windows *starting* within the last `--horizon-hours` (default 12) of the stay are kept, each labeled with the patient's whole-stay `In-hospital_death` outcome. The 12 h is a window filter, not a prediction horizon. See `docs/DATASET_SCHEMAS.md`.
+- Covers all 12 SynCura features natively (SpO2 read as SaO2).
+- Extracted and located in `data/predicting-mortality-...-2012-1.0.0/set-c/` and `set-c_full/set-c/`.
+- Loader: `ml/dataset.py` (90-min windows, stride 15/30, proximity labels).
 
-### 2. Challenge 2019 (sepsis) set A — scale-up data (real)
-- 20,336 ICU stays, hourly rows, pipe-delimited `.psv`, per-hour `SepsisLabel` (~9% positive).
+
+### 2. Challenge 2019 (sepsis) set A + set B — scale-up data (real)
+- 40,336 ICU stays total (set A: 20,336; set B: 20,000), hourly rows, pipe-delimited `.psv`, per-hour `SepsisLabel` (~9% positive).
 - Maps to 11/12 features (HR, O2Sat, Temp, SBP, DBP, Resp, BUN, Creatinine, Glucose, WBC, Platelets; **no GCS** — the 2019 schema has no GCS column).
-- Use: second training corpus / deterioration-label experiments. Loader: `ml/challenge2019_to_features.py`, reusing the canonical `SERVING_FEATURES` order and `ml/dataset.py` windowing. Its patient-level label collapses `SepsisLabel`, so it means sepsis onset rather than in-hospital death; do not pool it with PhysioNet labels. Policy: cleared for `train`, not for `deploy_train` in `ml/dataset_registry.py`.
+- Use: second training corpus / deterioration-label experiments. Loader: `ml/challenge2019_to_features.py`, reusing the canonical `SERVING_FEATURES` order and `ml/dataset.py` windowing. Supports passing setA, setB, or both directories.
+
+### 3. VitalDB (perioperative & ICU) — open-access mortality data (real)
+- 6,388 surgical and ICU patients, 1,204 ICU admissions, 74 clinical parameters + laboratory tests.
+- Stored locally in `data/vitaldb/` (`cases.csv`, `labs.csv`, `trks.csv`).
+- Target label: `death_inhosp` (in-hospital mortality, matching PhysioNet's `In-hospital_death`).
+- Covers all 5 major laboratory features (BUN, Creatinine, Glucose, WBC, Platelets) + patient demographics (Age, Sex, BMI).
+- Loader: `ml/vitaldb_to_features.py` producing `(df_pivot, label, patient_id)` tuples.
+
 
 ### 3. SICdb v1.0.8 (Salzburg) — PENDING access, not on disk yet
 - ~27,350 ICU admissions (2013–2021, 4 units, Salzburg), hourly + minute-level vitals/labs/meds, mortality via `cases.OffsetOfDeath` (capped 1 yr, incl. out-of-hospital deaths).

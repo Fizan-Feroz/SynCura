@@ -39,7 +39,7 @@ DATASETS = {
     'physionet2012': {
         'kind': REAL,
         'capabilities': {'train', 'deploy_train', 'eval'},
-        'note': 'The only dataset currently wired into ml/dataset.py + ml/train.py.',
+        'note': 'Core clinical dataset: 12,000 ICU stays across Set A (4k), Set B (4k), and Set C (4k).',
     },
     'challenge2019': {
         'kind': REAL,
@@ -49,7 +49,17 @@ DATASETS = {
             'as In-hospital_death. Do not pool its labels with PhysioNet 2012 '
             'windows into one y vector without deliberately handling the '
             'label mismatch (see ml/challenge2019_to_features.py docstring). '
-            'Not cleared for deploy_train until that is resolved.'
+            'Not cleared for deploy_train until that is resolved. '
+            'Now supports both training_setA (20,336 stays) and training_setB (20,000 stays).'
+        ),
+    },
+    'vitaldb': {
+        'kind': REAL,
+        'capabilities': {'train', 'eval'},
+        'note': (
+            'Real open-access clinical database (6,388 cases, 1,204 ICU admissions) '
+            'with explicit in-hospital mortality labels (death_inhosp). Stored locally in PROJ/data/vitaldb/ '
+            'and loaded via ml.vitaldb_to_features.'
         ),
     },
     'mimic3_demo': {

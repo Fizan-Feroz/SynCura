@@ -39,6 +39,23 @@ def physionet2012_root():
     return os.path.join(data_root(), PHYSIONET2012_DIRNAME, PHYSIONET2012_INNER)
 
 
+def physionet2012_setC():
+    """Absolute path to the extracted PhysioNet 2012 set-c folder."""
+    return os.path.join(physionet2012_root(), 'set-c')
+
+
+
 def challenge2019_setA():
     """Absolute path to the Challenge-2019 training_setA folder."""
     return os.path.join(data_root(), 'challenge-2019-1.0.0', 'training', 'training_setA')
+
+
+def challenge2019_setB():
+    """Absolute path to the Challenge-2019 training_setB folder."""
+    return os.path.join(data_root(), 'challenge-2019-1.0.0', 'training', 'training_setB')
+
+
+def vitaldb_root():
+    """Absolute path to the VitalDB dataset folder."""
+    return os.path.join(data_root(), 'vitaldb')
+

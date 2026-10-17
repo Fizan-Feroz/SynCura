@@ -1,0 +1,23 @@
+{
+  "members": [
+    "scaleup_finetune_smoke/seed71"
+  ],
+  "checkpoints": [
+    "ml\\training_runs\\scaleup_finetune_smoke\\seed71\\model.pt"
+  ],
+  "scalers": [
+    "ml\\training_runs\\scaleup_finetune_smoke\\seed71\\scaler.json"
+  ],
+  "model_classes": [
+    "attention"
+  ],
+  "val_auc": 0.6859010618786578,
+  "val_accuracy": 0.5812024405292384,
+  "val_recall": 0.6822916666666666,
+  "fresh_holdout_auc": 0.8765914351851852,
+  "fresh_holdout_accuracy": 0.75,
+  "fresh_holdout_recall": 1.0,
+  "candidate_only": true,
+  "holdout_gate": 0.83,
+  "passes_gate": true
+}

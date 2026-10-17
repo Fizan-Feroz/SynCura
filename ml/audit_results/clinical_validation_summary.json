@@ -1,0 +1,123 @@
+{
+  "holdout_metrics": {
+    "auroc": 0.8416517062607011,
+    "auroc_95ci": [
+      0.8038957774898479,
+      0.8765144639318863
+    ],
+    "auprc": 0.4686172592003168,
+    "auprc_95ci": [
+      0.37010090134774837,
+      0.5660271001037073
+    ],
+    "brier_score": 0.15168116118565864,
+    "brier_95ci": [
+      0.13730825640545455,
+      0.16668912763248087
+    ],
+    "ece": 0.1928065629785319
+  },
+  "patient_level_tiers": {
+    "tier_0.5": {
+      "patient_sensitivity": 0.8222222222222222,
+      "patient_specificity": 0.6879562043795621,
+      "patient_precision": 0.3020408163265306
+    },
+    "tier_0.7": {
+      "patient_sensitivity": 0.6555555555555556,
+      "patient_specificity": 0.833941605839416,
+      "patient_precision": 0.3933333333333333
+    },
+    "tier_0.8": {
+      "patient_sensitivity": 0.43333333333333335,
+      "patient_specificity": 0.9361313868613139,
+      "patient_precision": 0.527027027027027
+    }
+  },
+  "persistence_rules": {
+    "k_1": {
+      "accuracy": 0.7632575757575758,
+      "sensitivity": 0.7615740740740741,
+      "specificity": 0.7635340632603407,
+      "precision": 0.3459516298633018
+    },
+    "k_2": {
+      "accuracy": 0.7708986415882968,
+      "sensitivity": 0.725,
+      "specificity": 0.7784367396593674,
+      "precision": 0.3495535714285714
+    },
+    "k_3": {
+      "accuracy": 0.7778213166144201,
+      "sensitivity": 0.6893518518518519,
+      "specificity": 0.7923509732360098,
+      "precision": 0.3528436018957346
+    }
+  },
+  "saps_baseline": {
+    "saps_auroc": 0.6749087591240875,
+    "saps_auprc": 0.2736210466717892
+  },
+  "shap_top_features": [
+    {
+      "feature_idx": 84,
+      "importance": 0.3604156462258749
+    },
+    {
+      "feature_idx": 0,
+      "importance": 0.2696583696517239
+    },
+    {
+      "feature_idx": 82,
+      "importance": 0.2228710785084176
+    },
+    {
+      "feature_idx": 5,
+      "importance": 0.18796598962810518
+    },
+    {
+      "feature_idx": 3,
+      "importance": 0.1639224959208873
+    },
+    {
+      "feature_idx": 87,
+      "importance": 0.1591582798847954
+    },
+    {
+      "feature_idx": 80,
+      "importance": 0.1474176439408396
+    },
+    {
+      "feature_idx": 14,
+      "importance": 0.13723808822600983
+    },
+    {
+      "feature_idx": 6,
+      "importance": 0.13625467575403832
+    },
+    {
+      "feature_idx": 90,
+      "importance": 0.13507207816896666
+    },
+    {
+      "feature_idx": 26,
+      "importance": 0.11790698415378335
+    },
+    {
+      "feature_idx": 8,
+      "importance": 0.11569938560055745
+    },
+    {
+      "feature_idx": 29,
+      "importance": 0.11235991246266105
+    },
+    {
+      "feature_idx": 11,
+      "importance": 0.11180928976943062
+    },
+    {
+      "feature_idx": 2,
+      "importance": 0.061973444593927424
+    }
+  ]
+}
