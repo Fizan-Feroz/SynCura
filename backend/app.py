@@ -626,12 +626,19 @@ def explain_patient(patient_id: str):
     try:
         from ml.explain import compute_shap_explanation
         importance = compute_shap_explanation(inference_engine.model, X, FEATURES, n_background=10)
+        from ml.clinical_explainer import build_physician_shap_report
+        patient_record = patient_data.get(patient_id, {})
+        vitals_dict = patient_record.get("vitals", {})
+        risk = inference_engine.get_risk_score(patient_id)
+        clinical_report = build_physician_shap_report(importance, vitals_dict, risk)
     except Exception as e:
         importance = {"error": str(e)}
+        clinical_report = {"error": str(e)}
 
     return {
         "patient_id": patient_id,
         "feature_importance": importance,
+        "clinical_report": clinical_report,
         "attention_weights": attention,
         "features_used": FEATURES,
     }

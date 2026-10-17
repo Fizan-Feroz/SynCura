@@ -225,12 +225,13 @@ export default function Dashboard({ theme, onToggleTheme }) {
       try {
         const body = await apiGet(`/patient/${encodeURIComponent(pid)}/explain`)
         const imp = body?.feature_importance
+        const rep = body?.clinical_report
         if (cancelled || !imp || typeof imp !== 'object' || imp.error) return null
         const top = Object.entries(imp)
           .sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]))
           .slice(0, 3)
           .map(([name]) => name)
-        return [pid, top]
+        return [pid, { features: top, clinical_report: rep }]
       } catch {
         return null
       }
@@ -243,7 +244,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
       if (Object.keys(fresh).length) {
         setExplainMap((prev) => {
           const next = { ...prev }
-          for (const [pid, top] of Object.entries(fresh)) next[pid] = { features: top, at: Date.now() }
+          for (const [pid, data] of Object.entries(fresh)) next[pid] = { ...data, at: Date.now() }
           return next
         })
       }
@@ -252,12 +253,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
       cancelled = true
     }
   }, [alertPids, backendOnline]) // eslint-disable-line react-hooks/exhaustive-deps
-  const flatExplain = useMemo(() => {
-    const flat = {}
-    for (const [pid, entry] of Object.entries(explainMap)) flat[pid] = entry.features
-    return flat
-  }, [explainMap])
-  const alerts = useMemo(() => buildAlerts(patientQueue, flatExplain), [patientQueue, flatExplain])
+  const alerts = useMemo(() => buildAlerts(patientQueue, explainMap), [patientQueue, explainMap])
 
   // Demo/live-simulated alerts -> Discord via the backend (POST /alerts/demo).
   // The browser never holds the webhook secret; the backend applies the same
