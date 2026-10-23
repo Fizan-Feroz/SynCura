@@ -6,6 +6,8 @@ import { gsap, Flip, REDUCED } from '../motion/gsap'
 import AppShell from './AppShell'
 import { riskLabel, riskTone, seriesPath } from './trace'
 import { buildAlerts, calculateNews2 } from './alerts'
+import { SoundToggle } from './SoundToggle'
+import { playWarning, playCritical } from '../utils/sounds'
 
 const RERANK_MS = 5000
 
@@ -255,6 +257,21 @@ export default function Dashboard({ theme, onToggleTheme }) {
   }, [alertPids, backendOnline]) // eslint-disable-line react-hooks/exhaustive-deps
   const alerts = useMemo(() => buildAlerts(patientQueue, explainMap), [patientQueue, explainMap])
 
+  // Sound alerts: play warning/critical cues when new alerts appear
+  const prevAlertsRef = useRef([])
+  useEffect(() => {
+    const prev = prevAlertsRef.current
+    const next = alerts
+    for (const alert of next) {
+      const had = prev.find(a => a.key === alert.key)
+      if (!had && (alert.level === 'warning' || alert.level === 'critical')) {
+        if (alert.level === 'critical') playCritical()
+        else playWarning()
+      }
+    }
+    prevAlertsRef.current = next
+  }, [alerts])
+
   // Demo/live-simulated alerts -> Discord via the backend (POST /alerts/demo).
   // The browser never holds the webhook secret; the backend applies the same
   // per-patient cooldown as live alerts and tags every message [Demo ...].
@@ -363,6 +380,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                     Reset beds
                   </button>
                 </div>
+                <SoundToggle />
                 <span className="live-status station-live is-live" aria-live="polite">
                   <span className="live-dot" aria-hidden="true" />
                   Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}{liveMeta.simulated ? ' · simulated' : ''}
