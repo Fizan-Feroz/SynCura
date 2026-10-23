@@ -65,6 +65,7 @@
   --watch: #b77a0a;
   --high: #c75a16;
   --critical: #c4223f;
+  --critical-rgb: 196, 34, 63;
   --stable-bg: #e5f2ee;
   --watch-bg: #f8efdc;
   --critical-bg: #f9e3e6;
@@ -97,6 +98,7 @@
   --watch: #ffc94a;
   --high: #ff8a3d;
   --critical: #ff4d6a;
+  --critical-rgb: 255, 77, 106;
   --stable-bg: rgba(63, 214, 164, 0.12);
   --watch-bg: rgba(255, 201, 74, 0.12);
   --critical-bg: rgba(255, 77, 106, 0.14);

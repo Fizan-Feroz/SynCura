@@ -1,18 +1,14 @@
-import React, { useEffect, useState } from 'react'
-import { getSoundEnabled, setSoundEnabled } from '../utils/sounds'
+import React, { useState } from 'react'
+import { getSoundEnabled, setSoundEnabled, primeAudio } from '../utils/sounds'
 
 export function SoundToggle({ className = '' }) {
   const [enabled, setEnabled] = useState(() => getSoundEnabled())
-
-  useEffect(() => {
-    const stored = getSoundEnabled()
-    setEnabled(stored)
-  }, [])
 
   const toggle = () => {
     const next = !enabled
     setEnabled(next)
     setSoundEnabled(next)
+    if (next) primeAudio()
   }
 
   return (
