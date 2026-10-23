@@ -266,20 +266,22 @@ export default function Dashboard({ theme, onToggleTheme }) {
   // Sound + flash: fire on *escalation*. Alert keys are per bed, so a bed
   // going warning -> critical keeps the same key; compare severity rank, not
   // key presence, or the critical cue never triggers.
-  const prevAlertsRef = useRef([])
-  const prevSourceRef = useRef(source)
+  const prevAlertsRef = useRef(null)
   const [flashKeys, setFlashKeys] = useState([])
   useEffect(() => {
-    const sourceChanged = prevSourceRef.current !== source
-    prevSourceRef.current = source
+    const prev = prevAlertsRef.current
+    // A source switch re-renders the board in separate commits, so compare the
+    // beds themselves: no shared alert key means this is a different board.
+    const prevKeys = prev ? new Set(prev.map((a) => a.key)) : null
+    const sameBoard = prevKeys ? alerts.some((a) => prevKeys.has(a.key)) : false
 
     let escalated
-    if (sourceChanged) {
-      // A source switch swaps every bed at once: never fire a burst of warning
-      // cues, but a board that arrives with critical beds should still alarm.
+    if (!prev || !sameBoard) {
+      // New board (mount or a source switch): only beds that are already
+      // critical should alarm, never a burst of warnings.
       escalated = alerts.filter((a) => a.level === 'critical')
     } else {
-      const prevRank = new Map(prevAlertsRef.current.map((a) => [a.key, SEVERITY[a.level] ?? 0]))
+      const prevRank = new Map(prev.map((a) => [a.key, SEVERITY[a.level] ?? 0]))
       escalated = alerts.filter((a) => {
         const before = prevRank.get(a.key)
         if (before === undefined) return true
@@ -294,9 +296,9 @@ export default function Dashboard({ theme, onToggleTheme }) {
     if (freshCritical.length) playCritical()
     else if (escalated.some((a) => a.level === 'warning')) playWarning()
     if (freshCritical.length) {
-      setFlashKeys((prev) => [...new Set([...prev, ...freshCritical])])
+      setFlashKeys((prevKeys2) => [...new Set([...prevKeys2, ...freshCritical])])
     }
-  }, [alerts, source])
+  }, [alerts])
 
   // Clear the flash once the cue has finished.
   useEffect(() => {

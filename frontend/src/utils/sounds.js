@@ -4,10 +4,13 @@
 
 const STORAGE_KEY = 'syncura-sound-enabled'
 const CRITICAL_SECONDS = 5
+const WARNING_GAP_MS = 1200
 
 let warningAudio = null
 let criticalAudio = null
 let criticalStopTimer = null
+let criticalUntil = 0
+let lastWarningAt = 0
 let soundEnabled = true
 
 function readStoredEnabled() {
@@ -149,6 +152,11 @@ export function installAudioUnlock() {
 
 export function playWarning() {
   if (!soundEnabled) return
+  const now = Date.now()
+  // Never talk over an active critical siren, and never stack warning cues.
+  if (now < criticalUntil) return
+  if (now - lastWarningAt < WARNING_GAP_MS) return
+  lastWarningAt = now
   const audio = getWarningAudio()
   try {
     audio.currentTime = 0
@@ -162,6 +170,7 @@ export function playCritical() {
   if (!soundEnabled) return
   const audio = getCriticalAudio()
   stopCritical()
+  criticalUntil = Date.now() + CRITICAL_SECONDS * 1000
   try {
     audio.currentTime = 0
     audio.play().catch(() => {})
@@ -180,6 +189,7 @@ export function playCritical() {
 }
 
 export function stopCritical() {
+  criticalUntil = 0
   if (criticalStopTimer) {
     clearTimeout(criticalStopTimer)
     criticalStopTimer = null
@@ -201,7 +211,17 @@ export function setSoundEnabled(enabled) {
   } catch {
     /* private mode */
   }
-  if (!enabled) stopCritical()
+  if (!enabled) {
+    stopCritical()
+    if (warningAudio) {
+      try {
+        warningAudio.pause()
+        warningAudio.currentTime = 0
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
 
 export function getSoundEnabled() {
