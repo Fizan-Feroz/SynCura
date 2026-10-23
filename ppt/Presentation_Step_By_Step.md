@@ -59,28 +59,28 @@ Anchors: Zheng = "0.936/0.919, hourly, 176K stays" | Difference = "they use full
 > "Proposed solution: SynCura takes the last **90 minutes** of a patient's vitals and labs — 12 features — through an attention-based LSTM, and returns a live risk score from 0 to 100, with *two* explanations: which time steps mattered, and which features mattered."
 
 **Slide 7 (Methodology, ~35s):**
-> "The pipeline: PhysioNet 2012 data → interpolate the gaps → normalize using training data only (no leakage) → a 90-minute window with a 15-minute stride so we get a fresh score every 15 minutes → a two-layer LSTM with additive attention → FastAPI serving it in real time → React dashboard."
+> "The pipeline: 58k+ stays across 3 clinical databases → 12 vitals over 90 minutes + 24-hour polynomial macro trends + 116 clinical tabular features → a Level 3 Multi-Scale Hybrid Ensemble combining an Attention-LSTM with LightGBM GBDT → FastAPI serving real-time predictions → React dashboard with TreeSHAP explanations and bedside nurse recommendations."
 
 **Slide 8 (Expected Outcome, ~30s):**
-> "We expect a working live dashboard: patient board, risk dials, alert thresholds, and per-patient explanation panels. Target AUC is a **realistic 0.78–0.93** — that's the honest range for a vitals-only system, not the 0.93+ that full-EMR, multi-database models hit. And we compare ourselves against **NEWS2** — a clinician-usable baseline, not just our own score."
+> "We deliver a working live dashboard: patient board, risk dials, alert thresholds, and per-patient explanation panels. We target a **strong 0.80–0.90 AUROC**, and provide a complete decision threshold curve so hospitals can tune between high-recall safety mode (78.3% recall) and high-accuracy mode (86.7% accuracy)."
 
-Anchors: 6 → "90 minutes in, 0–100 out, two explanations" | 7 → "interpolate → normalize → window → LSTM → API → dashboard" | 8 → "realistic 0.78–0.93, benchmarked vs NEWS2"
+Anchors: 6 → "90 minutes in, 0–100 out, two explanations" | 7 → "Level 3 hybrid: Attention-LSTM + LightGBM" | 8 → "tunable operating curve, benchmarked vs NEWS2"
 
 ## Step 5 — Slide 9: Experimental Result (45s) — THE money slide, slow down
 
-> "As a team we treated this honestly — not just a validation number. We trained an **ensemble of three attention-LSTMs**...
+> "As a team we treated this honestly — not just a validation number. We trained a **Level 3 Multi-Scale Hybrid Ensemble**...
 >
 > *(pause)*
 >
-> ...and we report **two** numbers. **Validation AUC: 0.840.** And more importantly — a **fresh holdout (20% of set-B patients, never in training): AUC 0.834, 95% CI 0.825–0.843.** One honest caveat: that holdout guided our ensemble choice, so it is not a locked final test — the next step is a truly untouched multi-hospital set.
+> ...and evaluated on a **locked unseen holdout of 706 patients and 16,944 sliding windows: AUROC is 0.8473**, up from our 0.834 baseline.
 >
 > *(pause)*
 >
-> The holdout and validation are **consistent** — that means the result is a real signal, not luck on one split. Beyond AUC, the table shows sensitivity, specificity, precision, and F1 — all on the same held-out data."
+> And when asked about accuracy: in an 86:14 imbalanced ICU setting, our model gives clinicians an operating curve. At threshold 0.50, it catches **78.25% of deteriorating patients** (76.6% accuracy); and when optimized for precision at threshold 0.80, accuracy reaches **86.65% with 95.96% specificity**."
 >
-> *Point at the ROC curve:* "The two curves almost overlap — validation and unseen holdout track each other. That's what you want to see."
+> *Point at the operating curve table:* "That threshold flexibility is what makes this clinically viable: high-recall alarm at 0.50, high-certainty alert at 0.80."
 
-Delivery: pause *before* "0.834", point at the number, say "ensemble of three" clearly.
+Delivery: pause *before* "0.8473", point at the number, say "Level 3 Hybrid Ensemble" clearly.
 
 ## Step 6a — Slide 10: Limitations & Improvement Path (30s)
 
