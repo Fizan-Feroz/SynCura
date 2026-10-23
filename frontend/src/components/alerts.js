@@ -82,13 +82,13 @@ export function buildAlerts(patients, explainMap = {}) {
       modelAttribution = `Model attribution: ${modelTop.join(', ')}`
     }
 
-    if (p.risk >= 90) {
+    if (p.risk >= 85) {
       alerts.push({
         ...base,
         level: 'critical',
         title: 'Very high risk',
         condition: `Pattern: ${topClinicalPattern(p.vitals).toLowerCase()}`,
-        signal: `Risk ${p.risk}% (alerts at 90%).`,
+        signal: `Risk ${p.risk}% (critical threshold is 85%).`,
         cause: 'Concerning acute vitals combined with multi-hour trajectory indicate impending decompensation.',
         action: doctorAction || 'See the patient now and follow your unit\u2019s escalation protocol.',
         modelAttribution,

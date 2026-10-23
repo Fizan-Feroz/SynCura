@@ -90,19 +90,30 @@ const DEMO_LAB_BOUNDS = { GCS: [3, 15], BUN: [5, 80], Creatinine: [0.4, 6.0], WB
 // the real model does, so backend-identical values peak at ~81, just under
 // Critical. Without any nudge the demo equilibrates near ~60 and no scenario
 // ever reaches Critical.
-const DEMO_NUDGE_PER_TICK = { baseline: 0.0, respiratory: 1.5, septic: 2.0, cardiac: 2.0, recovery: -2.0 }
-const DEMO_NUDGE_CAP = 26
-const DEMO_NUDGE_RAMP_TICKS = 13
+const DEMO_NUDGE_PER_TICK = { baseline: 0.0, respiratory: 2.0, septic: 2.5, cardiac: 2.5, recovery: -2.0 }
+const DEMO_NUDGE_CAP = 32
+const DEMO_NUDGE_RAMP_TICKS = 16
 
 function seedDemoBeds(patients) {
-  return (Array.isArray(patients) ? patients : []).map((patient) => {
-    const trajectory = assignTrajectory()
+  return (Array.isArray(patients) ? patients : []).map((patient, index) => {
+    // Bed ICU-06 has high baseline acuity so clinicians can immediately observe a critical state in demo
+    const isPrimaryCritical = patient.bed === 'ICU-06' || index === 5
+    const trajectory = isPrimaryCritical ? 'severe' : assignTrajectory()
     const profile = trajectoryProfile(trajectory)
     const risk = Math.round(clamp(
-      trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk,
+      isPrimaryCritical ? 88 : (trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk),
       8, 95
     ))
     const vitals = { ...patient.vitals }
+    if (isPrimaryCritical) {
+      vitals.HR = 132
+      vitals.SpO2 = 87
+      vitals.Resp = 32
+      vitals.Temp = 39.2
+      vitals.GCS = 9
+      vitals.BUN = 34.0
+      vitals.Creatinine = 2.1
+    }
     for (const [lab, anchor] of Object.entries(DEMO_LAB_ANCHORS)) {
       if (!Number.isFinite(vitals[lab])) vitals[lab] = anchor
     }
@@ -110,12 +121,15 @@ function seedDemoBeds(patients) {
       ...patient,
       risk,
       riskBase: risk,
-      trend: '+0',
+      status: statusForRisk(risk),
+      trend: isPrimaryCritical ? '+4' : '+0',
       lead: profile.lead,
       trajectory,
       drift_mult: 0.85 + Math.random() * 0.3,
       vitals,
-      waveform: [...patient.waveform.slice(0, -1), risk],
+      waveform: isPrimaryCritical
+        ? [...patient.waveform.slice(0, -3), 78, 84, 88]
+        : [...patient.waveform.slice(0, -1), risk],
       history: [{ t: Date.now(), ...vitals, risk }],
     }
   })
