@@ -6,8 +6,11 @@ import { gsap, Flip, REDUCED } from '../motion/gsap'
 import AppShell from './AppShell'
 import { riskLabel, riskTone, seriesPath } from './trace'
 import { buildAlerts, calculateNews2 } from './alerts'
+import { SoundToggle } from './SoundToggle'
+import { playWarning, playCritical, installAudioUnlock } from '../utils/sounds'
 
 const RERANK_MS = 5000
+const SEVERITY = { info: 0, warning: 1, critical: 2 }
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value))
@@ -72,7 +75,7 @@ function Readout({ label, value, unit, color, big = false }) {
   )
 }
 
-function BedTile({ patient, onSelect, threshold }) {
+function BedTile({ patient, onSelect, threshold, isCriticalNew }) {
   const vitals = patient.vitals || {}
   const waveform = Array.isArray(patient.waveform) ? patient.waveform : []
   const tone = riskTone(patient.risk)
@@ -82,7 +85,7 @@ function BedTile({ patient, onSelect, threshold }) {
     <li className="bed" data-flip-id={patient.patient_id}>
       <button
         type="button"
-        className={`bed-tile tone-${tone} ${over ? 'is-over' : ''}`}
+        className={`bed-tile tone-${tone} ${over ? 'is-over' : ''}${isCriticalNew ? ' is-critical-new' : ''}`}
         onClick={() => onSelect(patient.patient_id)}
         aria-label={`${patient.bed}, patient ${patient.patient_id}, risk ${patient.risk} percent, ${riskLabel(patient.risk)}. Open profile.`}
       >
@@ -255,6 +258,55 @@ export default function Dashboard({ theme, onToggleTheme }) {
   }, [alertPids, backendOnline]) // eslint-disable-line react-hooks/exhaustive-deps
   const alerts = useMemo(() => buildAlerts(patientQueue, explainMap), [patientQueue, explainMap])
 
+  // Sound alerts: install the one-time gesture unlock as soon as the board mounts.
+  useEffect(() => {
+    installAudioUnlock()
+  }, [])
+
+  // Sound + flash: fire on *escalation*. Alert keys are per bed, so a bed
+  // going warning -> critical keeps the same key; compare severity rank, not
+  // key presence, or the critical cue never triggers.
+  const prevAlertsRef = useRef(null)
+  const [flashKeys, setFlashKeys] = useState([])
+  useEffect(() => {
+    const prev = prevAlertsRef.current
+    // A source switch re-renders the board in separate commits, so compare the
+    // beds themselves: no shared alert key means this is a different board.
+    const prevKeys = prev ? new Set(prev.map((a) => a.key)) : null
+    const sameBoard = prevKeys ? alerts.some((a) => prevKeys.has(a.key)) : false
+
+    let escalated
+    if (!prev || !sameBoard) {
+      // New board (mount or a source switch): only beds that are already
+      // critical should alarm, never a burst of warnings.
+      escalated = alerts.filter((a) => a.level === 'critical')
+    } else {
+      const prevRank = new Map(prev.map((a) => [a.key, SEVERITY[a.level] ?? 0]))
+      escalated = alerts.filter((a) => {
+        const before = prevRank.get(a.key)
+        if (before === undefined) return true
+        return (SEVERITY[a.level] ?? 0) > before
+      })
+    }
+    prevAlertsRef.current = alerts
+
+    if (!escalated.length) return
+
+    const freshCritical = escalated.filter((a) => a.level === 'critical').map((a) => a.key)
+    if (freshCritical.length) playCritical()
+    else if (escalated.some((a) => a.level === 'warning')) playWarning()
+    if (freshCritical.length) {
+      setFlashKeys((prevKeys2) => [...new Set([...prevKeys2, ...freshCritical])])
+    }
+  }, [alerts])
+
+  // Clear the flash once the cue has finished.
+  useEffect(() => {
+    if (!flashKeys.length) return undefined
+    const timer = setTimeout(() => setFlashKeys([]), (5 + 1) * 1000)
+    return () => clearTimeout(timer)
+  }, [flashKeys])
+
   // Demo/live-simulated alerts -> Discord via the backend (POST /alerts/demo).
   // The browser never holds the webhook secret; the backend applies the same
   // per-patient cooldown as live alerts and tags every message [Demo ...].
@@ -346,55 +398,37 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 Demo
               </button>
             </div>
+            <div className="segmented" role="group" aria-label="Scenario">
+              {scenarioEntries.map(([key, s]) => (
+                <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <div className="station-actions">
+              <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
+                {isPaused ? 'Start stream' : 'Pause stream'}
+              </button>
+              <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
+                Reset beds
+              </button>
+            </div>
+            <SoundToggle />
             {live ? (
-              <>
-                <div className="segmented" role="group" aria-label="Scenario">
-                  {scenarioEntries.map(([key, s]) => (
-                    <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="station-actions">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
-                    {isPaused ? 'Start stream' : 'Pause stream'}
-                  </button>
-                  <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
-                    Reset beds
-                  </button>
-                </div>
-                <span className="live-status station-live is-live" aria-live="polite">
-                  <span className="live-dot" aria-hidden="true" />
-                  Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}{liveMeta.simulated ? ' · simulated' : ''}
-                </span>
-              </>
+              <span className="live-status station-live is-live" aria-live="polite">
+                <span className="live-dot" aria-hidden="true" />
+                Backend live · {patientQueue.length} beds · {activeScenarioLabel} · tick {liveMeta.tick}{liveMeta.simulated ? ' · simulated' : ''}
+              </span>
             ) : replay ? (
               <span className="live-status station-live is-live" aria-live="polite">
                 <span className="live-dot" aria-hidden="true" />
                 Backend replay · retrospective
               </span>
             ) : (
-              <>
-                <div className="segmented" role="group" aria-label="Scenario">
-                  {scenarioEntries.map(([key, s]) => (
-                    <button key={key} type="button" aria-pressed={activeScenario === key} onClick={() => setActiveScenario(key)}>
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="station-actions">
-                  <button type="button" className="btn btn-primary btn-sm" onClick={toggleSimulation}>
-                    {isPaused ? 'Start stream' : 'Pause stream'}
-                  </button>
-                  <button type="button" className="btn btn-quiet btn-sm" onClick={resetSimulation}>
-                    Reset beds
-                  </button>
-                </div>
-                <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
-                  <span className="live-dot" aria-hidden="true" />
-                  {isPaused ? 'Demo paused' : 'Demo running · this browser only'}
-                </span>
-              </>
+              <span className={`live-status station-live ${isPaused ? '' : 'is-live'}`} aria-live="polite">
+                <span className="live-dot" aria-hidden="true" />
+                {isPaused ? 'Demo paused' : 'Demo running · this browser only'}
+              </span>
             )}
           </div>
         </header>
@@ -480,9 +514,18 @@ export default function Dashboard({ theme, onToggleTheme }) {
           <section aria-labelledby="beds-title">
             <h2 id="beds-title" className="sr-only">Beds ranked by risk</h2>
             <ol className="beds" ref={gridRef}>
-              {ranked.map((p) => (
-                <BedTile key={p.patient_id} patient={p} onSelect={(id) => navigate(`/bed/${id}`)} threshold={threshold} />
-              ))}
+              {ranked.map((p) => {
+                const isCriticalNew = flashKeys.includes(`${p.patient_id}-alert`)
+                return (
+                  <BedTile
+                    key={p.patient_id}
+                    patient={p}
+                    onSelect={(id) => navigate(`/bed/${id}`)}
+                    threshold={threshold}
+                    isCriticalNew={isCriticalNew}
+                  />
+                )
+              })}
             </ol>
           </section>
 
@@ -498,7 +541,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
                 <>
                   <ul className="alerts">
                     {alerts.map((a) => (
-                      <li key={a.key} className={`alert alert-${a.level}`}>
+                      <li key={a.key} className={`alert alert-${a.level}${a.level === 'critical' && flashKeys.includes(a.key) ? ' is-new' : ''}`}>
                         <span className="alert-bed">{a.bed}</span>
                         <span className="alert-body">
                           <strong className="alert-title">{a.title}</strong>
