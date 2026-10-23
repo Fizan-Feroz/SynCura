@@ -135,6 +135,7 @@ export default function HeroFilm() {
           .set(pen, { autoAlpha: 1 }, t + 2.2)
           .fromTo('.film-copy > *', { autoAlpha: 0, y: 24 }, { autoAlpha: 1, y: 0, duration: 0.8, stagger: 0.1, ease: 'power3.out' }, t + 1.5)
 
+        tl.timeScale(1.2)
         film.current = tl
         tl.play(0)
 
