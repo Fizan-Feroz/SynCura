@@ -95,25 +95,13 @@ const DEMO_NUDGE_CAP = 32
 const DEMO_NUDGE_RAMP_TICKS = 16
 
 function seedDemoBeds(patients) {
-  return (Array.isArray(patients) ? patients : []).map((patient, index) => {
-    // Bed ICU-06 has high baseline acuity so clinicians can immediately observe a critical state in demo
-    const isPrimaryCritical = patient.bed === 'ICU-06' || index === 5
-    const trajectory = isPrimaryCritical ? 'severe' : assignTrajectory()
+  return (Array.isArray(patients) ? patients : []).map((patient) => {
+    const trajectory = assignTrajectory()
     const profile = trajectoryProfile(trajectory)
-    const risk = Math.round(clamp(
-      isPrimaryCritical ? 88 : (trajectory === 'severe' ? patient.risk + 18 : trajectory === 'recovery' ? patient.risk - 10 : patient.risk),
-      8, 95
-    ))
+    // Seed risk stays at baseline so demo opens cleanly without immediate critical alerts.
+    // Trajectory shapes how the bed evolves tick-by-tick once the simulation starts.
+    const risk = Math.round(clamp(patient.risk, 8, 95))
     const vitals = { ...patient.vitals }
-    if (isPrimaryCritical) {
-      vitals.HR = 132
-      vitals.SpO2 = 87
-      vitals.Resp = 32
-      vitals.Temp = 39.2
-      vitals.GCS = 9
-      vitals.BUN = 34.0
-      vitals.Creatinine = 2.1
-    }
     for (const [lab, anchor] of Object.entries(DEMO_LAB_ANCHORS)) {
       if (!Number.isFinite(vitals[lab])) vitals[lab] = anchor
     }
@@ -122,19 +110,16 @@ function seedDemoBeds(patients) {
       risk,
       riskBase: risk,
       status: statusForRisk(risk),
-      trend: isPrimaryCritical ? '+4' : '+0',
+      trend: '+0',
       lead: profile.lead,
       trajectory,
       drift_mult: 0.85 + Math.random() * 0.3,
       vitals,
-      waveform: isPrimaryCritical
-        ? [...patient.waveform.slice(0, -3), 78, 84, 88]
-        : [...patient.waveform.slice(0, -1), risk],
+      waveform: [...patient.waveform.slice(0, -1), risk],
       history: [{ t: Date.now(), ...vitals, risk }],
     }
   })
 }
-
 function scoreContributionsDemo(vitals) {
   return (
     (vitals.HR - 85) * 0.24 +
@@ -260,7 +245,8 @@ export function SimulationProvider({ children }) {
   // browser sees identical beds; 'replay' shows whatever the backend has
   // actually ingested (PhysioNet replay or device posts). There is no local
   // simulation anymore — one shared state for everyone.
-  const [source, setSource] = useState('live')
+  // Default to 'demo' so the demo works immediately without requiring backend setup
+  const [source, setSource] = useState('demo')
   const [liveMeta, setLiveMeta] = useState({ scenario: 'baseline', scenarioLabel: 'Baseline Mix', tick: 0, paused: true })
   const [liveError, setLiveError] = useState(null)
   const [demoScenario, setDemoScenario] = useState('baseline')
@@ -434,6 +420,16 @@ export function SimulationProvider({ children }) {
   // for demos when shared state must stay untouched (or backend is down).
   // Ticks since the scenario was set drive the ramped display nudge.
   const demoTickRef = React.useRef(0)
+  // Load demo seed on mount if source defaults to demo
+  useEffect(() => {
+    if (source === 'demo') {
+      loadDemoSeed().then((seed) => {
+        setPatientQueue(seedDemoBeds(seed))
+        setLastUpdated(new Date())
+      })
+    }
+  }, [])
+
   useEffect(() => {
     demoTickRef.current = 0
   }, [source, demoScenario])
@@ -490,6 +486,7 @@ export function SimulationProvider({ children }) {
     if (next === 'demo') {
       setDemoScenario('baseline')
       setDemoPaused(true)
+      setPatientQueue([])
       loadDemoSeed().then((seed) => {
         setPatientQueue(seedDemoBeds(seed))
         setLastUpdated(new Date())

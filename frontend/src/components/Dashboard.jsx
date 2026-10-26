@@ -214,7 +214,7 @@ export default function Dashboard({ theme, onToggleTheme }) {
   // refreshed at most every 30s per bed — SHAP costs seconds per call, so
   // only beds with an active alert are ever queried.
   const [explainMap, setExplainMap] = useState({})
-  const alertPids = useMemo(() => buildAlerts(patientQueue).map((a) => a.patient_id), [patientQueue])
+  const alertPids = useMemo(() => isPaused ? [] : buildAlerts(patientQueue).map((a) => a.patient_id), [isPaused, patientQueue])
   useEffect(() => {
     if (!backendOnline || !alertPids.length) return undefined
     let cancelled = false
@@ -256,7 +256,13 @@ export default function Dashboard({ theme, onToggleTheme }) {
       cancelled = true
     }
   }, [alertPids, backendOnline]) // eslint-disable-line react-hooks/exhaustive-deps
-  const alerts = useMemo(() => buildAlerts(patientQueue, explainMap), [patientQueue, explainMap])
+  // Guard: never fire alerts while the simulation is paused (e.g. Demo first
+  // load). Showing a CRITICAL card before the user starts the stream is
+  // misleading — alerts only become meaningful once the engine is running.
+  const alerts = useMemo(
+    () => isPaused ? [] : buildAlerts(patientQueue, explainMap),
+    [isPaused, patientQueue, explainMap]
+  )
 
   // Sound alerts: install the one-time gesture unlock as soon as the board mounts.
   useEffect(() => {

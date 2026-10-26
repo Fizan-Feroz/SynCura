@@ -35,7 +35,7 @@ function fmtVital(value, digits = 0) {
 
 export default function BedProfile({ theme, onToggleTheme }) {
   const { patientId } = useParams()
-  const { patientQueue, backendOnline, source, liveMeta, setDataSource } = useSimulation()
+  const { patientQueue, backendOnline, source, liveMeta, isPaused, setDataSource } = useSimulation()
   const queued = patientQueue.find((p) => p.patient_id === patientId)
   const [shap, setShap] = useState(null)
   const [remoteBed, setRemoteBed] = useState(null)
@@ -109,7 +109,7 @@ export default function BedProfile({ theme, onToggleTheme }) {
   }
 
   const tone = riskTone(bed.risk)
-  const alert = buildAlerts([bed])[0] || null
+  const alert = isPaused ? null : (buildAlerts([bed])[0] || null)
   const history = Array.isArray(bed.history) ? bed.history : []
   const drivers = scoreContributions(bed.vitals)
 

@@ -229,13 +229,8 @@ class SimulationEngine:
     def _seed_bed(self, patient):
         trajectory = _assign_trajectory(self.rng)
         profile = TRAJECTORY_PROFILES[trajectory]
-        if trajectory == "severe":
-            risk = patient["risk"] + 18
-        elif trajectory == "recovery":
-            risk = patient["risk"] - 10
-        else:
-            risk = patient["risk"]
-        risk = _round_half_up(_clamp(risk, 8, 95))
+        # Seed risk stays at baseline -- trajectory shapes tick evolution
+        risk = _round_half_up(_clamp(patient["risk"], 8, 95))
         # Per-bed drift jitter so identical scenarios/trajectories still
         # produce distinct beds instead of converging to the same rails.
         drift_mult = 0.85 + self.rng.random() * 0.3
